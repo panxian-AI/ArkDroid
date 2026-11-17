@@ -34,6 +34,8 @@ public class BridgeService extends Service {
     static final String ACTION_START = "ai.panxian.arkdroid.action.START";
     static final String ACTION_STOP = "ai.panxian.arkdroid.action.STOP";
     static final String ACTION_RESTART = "ai.panxian.arkdroid.action.RESTART";
+    /** 只保活 + 起本地文件服务，不碰 Python 中继（安装 AstrBot 时用）。 */
+    static final String ACTION_SERVE = "ai.panxian.arkdroid.action.SERVE";
 
     private static final String CHANNEL = "arkdroid-run";
     private static final int NOTIF_ID = 1001;
@@ -46,6 +48,7 @@ public class BridgeService extends Service {
     private final Handler ui = new Handler(Looper.getMainLooper());
     private ExecutorService worker;
     private boolean polling;
+    private volatile boolean pythonWanted;
     private String lastNotification = "";
 
     @Override
@@ -71,8 +74,13 @@ public class BridgeService extends Service {
             case ACTION_RESTART:
                 doRestart();
                 break;
+            case ACTION_SERVE:
+                pythonWanted = false;
+                ensureServe();
+                break;
             case ACTION_START:
             default:
+                pythonWanted = true;
                 doStart();
                 break;
         }
@@ -141,6 +149,18 @@ public class BridgeService extends Service {
         });
     }
 
+    /** 起本地文件服务，让 Termux 能来取包 —— 进程被回收的话 Termux 那边就拉不到了。 */
+    private void ensureServe() {
+        worker.execute(() -> {
+            try {
+                String url = LocalServer.ensure(this);
+                LogBus.append("本地文件服务在跑：" + url);
+            } catch (IOException e) {
+                LogBus.append("本地文件服务起不来：" + e.getMessage());
+            }
+        });
+    }
+
     // ------------------------------------------------------------------ 轮询
 
     private void startPolling() {
@@ -159,14 +179,16 @@ public class BridgeService extends Service {
 
     private void pollOnce() {
         worker.execute(() -> {
-            String logs = PyEngine.call(BridgeService.this, "drain", null);
-            if (logs != null && !logs.trim().isEmpty()) {
-                LogBus.append(logs);
-            }
-            String json = PyEngine.call(BridgeService.this, "stats", null);
-            if (json != null && json.startsWith("{")) {
-                statusJson = json;
-                running = parseRunning(json);
+            if (pythonWanted) {
+                String logs = PyEngine.call(BridgeService.this, "drain", null);
+                if (logs != null && !logs.trim().isEmpty()) {
+                    LogBus.append(logs);
+                }
+                String json = PyEngine.call(BridgeService.this, "stats", null);
+                if (json != null && json.startsWith("{")) {
+                    statusJson = json;
+                    running = parseRunning(json);
+                }
             }
             astrOnline = portOpen(6185);
             arkOnline = portOpen(6700);
@@ -210,6 +232,9 @@ public class BridgeService extends Service {
     private String describeState() {
         if (running) {
             return astrOnline ? "中继运行中 · AstrBot 在线" : "中继运行中 · 等 AstrBot 连上来";
+        }
+        if (!pythonWanted) {
+            return "本地服务就绪 · 等 Termux 来取包";
         }
         return "中继已停止";
     }
@@ -279,6 +304,16 @@ public class BridgeService extends Service {
 
     static void restart(Context ctx) {
         Intent intent = new Intent(ctx, BridgeService.class).setAction(ACTION_RESTART);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            ctx.startForegroundService(intent);
+        } else {
+            ctx.startService(intent);
+        }
+    }
+
+    /** 只为“别被系统杀掉 + 本地服务在跑”，不启动中继。 */
+    static void serve(Context ctx) {
+        Intent intent = new Intent(ctx, BridgeService.class).setAction(ACTION_SERVE);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             ctx.startForegroundService(intent);
         } else {
