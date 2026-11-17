@@ -21,6 +21,7 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.widget.NestedScrollView;
 
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.switchmaterial.SwitchMaterial;
@@ -60,7 +61,14 @@ public class MainActivity extends AppCompatActivity {
     private TextView txtTerm;
     private ScrollView termScroll;
     private TextInputEditText inpCmd;
+    private NestedScrollView scroller;
+    private View cardBridge;
+    private View cardDl;
+    private View cardAstr;
+    private View cardTerm;
     private boolean welcomed;
+    private boolean credsAuto;
+    private boolean dlDoneNotice;
 
     private final Runnable termRefresh = new Runnable() {
         @Override
@@ -112,6 +120,7 @@ public class MainActivity extends AppCompatActivity {
         bind();
         fill();
         wire();
+        showVersion();
         askNotificationPermission();
 
         bg.execute(() -> {
@@ -181,6 +190,33 @@ public class MainActivity extends AppCompatActivity {
         txtTerm = findViewById(R.id.txtTerm);
         termScroll = findViewById(R.id.termScroll);
         inpCmd = findViewById(R.id.inpCmd);
+
+        scroller = findViewById(R.id.scroller);
+        cardBridge = findViewById(R.id.cardBridge);
+        cardDl = findViewById(R.id.cardDl);
+        cardAstr = findViewById(R.id.cardAstr);
+        cardTerm = findViewById(R.id.cardTerm);
+    }
+
+    /** 顶部导航：把对应卡片滚到可视区，别让人靠猜「功能在哪」。 */
+    private void jumpTo(View card) {
+        if (scroller == null || card == null) {
+            return;
+        }
+        scroller.post(() -> scroller.smoothScrollTo(0, Math.max(0, card.getTop() - 6)));
+    }
+
+    private void showVersion() {
+        TextView tv = findViewById(R.id.txtVersion);
+        if (tv == null) {
+            return;
+        }
+        String v = "?";
+        try {
+            v = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+        } catch (Exception ignored) {
+        }
+        tv.setText("v" + v);
     }
 
     private void fill() {
@@ -237,6 +273,12 @@ public class MainActivity extends AppCompatActivity {
             sendCommand("tail -n 40 ~/.arkdroid/install.log ~/.arkdroid/astr.log 2>/dev/null");
         });
         findViewById(R.id.btnTermClear).setOnClickListener(v -> Term.clear());
+
+        findViewById(R.id.navBridge).setOnClickListener(v -> jumpTo(cardBridge));
+        findViewById(R.id.navDl).setOnClickListener(v -> jumpTo(cardDl));
+        findViewById(R.id.navAstr).setOnClickListener(v -> jumpTo(cardAstr));
+        findViewById(R.id.navTerm).setOnClickListener(v -> jumpTo(cardTerm));
+        findViewById(R.id.navPanel).setOnClickListener(v -> openPanelInApp());
     }
 
     // ------------------------------------------------------------------ 状态刷新
@@ -287,6 +329,18 @@ public class MainActivity extends AppCompatActivity {
         }
 
         refreshDownload();
+
+        // AstrBot 一起来就自己去把面板账号读出来，不用人再点一次「读取账号」
+        if (astrUp && !credsAuto) {
+            credsAuto = true;
+            readCreds();
+        }
+        // 三个包都齐了，把人带到下一步
+        if (!dlDoneNotice && Downloads.allReady(this)) {
+            dlDoneNotice = true;
+            jumpTo(cardAstr);
+            toast("三个包都下好了，点「装 Termux」继续");
+        }
     }
 
     private void refreshDownload() {
@@ -415,8 +469,14 @@ public class MainActivity extends AppCompatActivity {
         Creds.reset();
         txtCreds.setText("正在读 AstrBot 配置…");
         BridgeService.serve(this);
-        Termux.send(this, "astr creds | curl -sS -m 60 -X POST --data-binary @- "
-                + "\"$ARKDROID_LOCAL/p/cred\"", 120);
+        // 落文件再 POST：管道喂 curl 会先缓冲，这条命令又依赖 $ARKDROID_LOCAL，绕开更稳
+        Termux.send(this,
+                "mkdir -p ~/.arkdroid"
+                        + "; astr creds > ~/.arkdroid/cred.txt 2>&1"
+                        + "; curl -sS -m 60 -X POST --data-binary @\"$HOME/.arkdroid/cred.txt\""
+                        + " \"$ARKDROID_LOCAL/p/cred\""
+                        + "; cat ~/.arkdroid/cred.txt",
+                120);
     }
 
     private void askResetPassword() {
