@@ -282,18 +282,28 @@ public class MainActivity extends AppCompatActivity {
                 return;
             }
             jumpTo(cardQq);
-            Term.note("$ curl -fsSL napcat.termux.sh | bash");
-            toast("开始装 NapCat，进度在「终端」里看");
+            Term.note("$ bash install.sh --qq-only   # QQ deb + NapCat 注入 + ArkLink");
+            toast("开始装本机 QQ（约 250 MB，进度在「终端」里看）");
             NapCat.install(this);
             ui.postDelayed(() -> NapCat.seedOneBotConfig(this), 5000);
         });
+        findViewById(R.id.btnQqStart).setOnClickListener(v -> {
+            if (!Termux.installed(this)) {
+                showTermuxHelp();
+                return;
+            }
+            jumpTo(cardQq);
+            Term.note("$ qq start; arklink start");
+            NapCat.start(this);
+            toast("QQ（无头）和 ArkLink 正在启动，稍后看状态");
+        });
         findViewById(R.id.btnQqWeb).setOnClickListener(v -> openWeb(NapCat.WEBUI_URL, "NapCat WebUI"));
         findViewById(R.id.btnQqFill).setOnClickListener(v -> {
-            inpArklink.setText(NapCat.ONEBOT_URL);
-            prefs.save(NapCat.ONEBOT_URL, value(inpAstrbot), value(inpSelfId),
+            inpArklink.setText(NapCat.ARKLINK_URL);
+            prefs.save(NapCat.ARKLINK_URL, value(inpAstrbot), value(inpSelfId),
                     value(inpArklinkToken), value(inpAstrbotToken));
             BridgeService.restart(this);
-            toast("中继已改成连本机 NapCat：" + NapCat.ONEBOT_URL);
+            toast("中继已改成连本机 ArkLink：" + NapCat.ARKLINK_URL);
         });
 
         findViewById(R.id.navQq).setOnClickListener(v -> jumpTo(cardQq));
@@ -560,12 +570,17 @@ public class MainActivity extends AppCompatActivity {
             NapCat.probedAt = now;              // 先占位，避免每 600ms 都压一个探测
             bg.execute(NapCat::probe);
         }
-        if (NapCat.webuiUp) {
-            tv.setText("在线 · WebUI " + NapCat.WEBUI_URL + "（点「扫码登录」打开）");
+        if (NapCat.arklinkUp && NapCat.webuiUp) {
+            tv.setText("链路在线：ArkLink 6700（中继连它）+ NapCat WebUI 6099");
             tv.setTextColor(getColor(R.color.ok));
+        } else if (NapCat.webuiUp) {
+            tv.setText("NapCat 在线（WebUI 6099），ArkLink 没起来——点「启动」或终端跑 arklink start。\n"
+                    + "记得在 WebUI「网络配置」新建 Milky 服务器：127.0.0.1:3000");
+            tv.setTextColor(getColor(R.color.warn));
         } else {
-            tv.setText("没响应。装的话点「装 NapCat」；装好了没起来，去终端里启动一次。\n"
-                    + "装好后 NapCat 的 OneBot 正向 WS 在 " + NapCat.ONEBOT_URL);
+            tv.setText("没响应。第一次：先点「装 NapCat」（会一并装 QQ + ArkLink），\n"
+                    + "装完点「启动」→「扫码登录」在 WebUI 里登录 QQ 并新建 Milky 服务器 127.0.0.1:3000，\n"
+                    + "最后点「填本机地址」，中继走 ws://127.0.0.1:6700/onebot/v11/ws");
             tv.setTextColor(getColor(R.color.muted));
         }
     }
