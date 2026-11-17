@@ -1,0 +1,13 @@
+{
+  "ref": "main",
+  "version": "0.1.0",
+  "files": [
+    "__init__.py",
+    "__main__.py",
+    "bridge.py",
+    "cli.py",
+    "config.py",
+    "probe.py",
+    "wsclient.py"
+  ]
+}
