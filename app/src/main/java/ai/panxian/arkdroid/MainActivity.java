@@ -66,6 +66,7 @@ public class MainActivity extends AppCompatActivity {
     private View cardDl;
     private View cardAstr;
     private View cardTerm;
+    private View cardQq;
     private boolean welcomed;
     private boolean credsAuto;
     private boolean dlDoneNotice;
@@ -196,6 +197,7 @@ public class MainActivity extends AppCompatActivity {
         cardDl = findViewById(R.id.cardDl);
         cardAstr = findViewById(R.id.cardAstr);
         cardTerm = findViewById(R.id.cardTerm);
+        cardQq = findViewById(R.id.cardQq);
     }
 
     /** 顶部导航：把对应卡片滚到可视区，别让人靠猜「功能在哪」。 */
@@ -274,6 +276,27 @@ public class MainActivity extends AppCompatActivity {
         });
         findViewById(R.id.btnTermClear).setOnClickListener(v -> Term.clear());
 
+        findViewById(R.id.btnQqInstall).setOnClickListener(v -> {
+            if (!Termux.installed(this)) {
+                showTermuxHelp();
+                return;
+            }
+            jumpTo(cardQq);
+            Term.note("$ curl -fsSL napcat.termux.sh | bash");
+            toast("开始装 NapCat，进度在「终端」里看");
+            NapCat.install(this);
+            ui.postDelayed(() -> NapCat.seedOneBotConfig(this), 5000);
+        });
+        findViewById(R.id.btnQqWeb).setOnClickListener(v -> openWeb(NapCat.WEBUI_URL, "NapCat WebUI"));
+        findViewById(R.id.btnQqFill).setOnClickListener(v -> {
+            inpArklink.setText(NapCat.ONEBOT_URL);
+            prefs.save(NapCat.ONEBOT_URL, value(inpAstrbot), value(inpSelfId),
+                    value(inpArklinkToken), value(inpAstrbotToken));
+            BridgeService.restart(this);
+            toast("中继已改成连本机 NapCat：" + NapCat.ONEBOT_URL);
+        });
+
+        findViewById(R.id.navQq).setOnClickListener(v -> jumpTo(cardQq));
         findViewById(R.id.navBridge).setOnClickListener(v -> jumpTo(cardBridge));
         findViewById(R.id.navDl).setOnClickListener(v -> jumpTo(cardDl));
         findViewById(R.id.navAstr).setOnClickListener(v -> jumpTo(cardAstr));
@@ -329,6 +352,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         refreshDownload();
+        refreshQq();
 
         // AstrBot 一起来就自己去把面板账号读出来，不用人再点一次「读取账号」
         if (astrUp && !credsAuto) {
@@ -369,7 +393,14 @@ public class MainActivity extends AppCompatActivity {
         }
         prefs.save(arklink, astrbot, value(inpSelfId), value(inpArklinkToken), value(inpAstrbotToken));
         BridgeService.restart(this);
-        toast("已保存，正在重启中继");
+        if (arklink.contains("127.0.0.1") || arklink.contains("localhost")) {
+            toast(NapCat.webuiUp
+                    ? "已保存。连的是手机本机，NapCat 在线，应该能通"
+                    : "已保存。但本机现在没有协议端在跑——127.0.0.1 指手机自己，"
+                      + "要么先装本机 QQ，要么填电脑的局域网 IP");
+        } else {
+            toast("已保存，正在重启中继");
+        }
     }
 
     private void runProbe() {
@@ -517,6 +548,37 @@ public class MainActivity extends AppCompatActivity {
 
     private void openPanel() {
         openPanelInApp();
+    }
+
+    private void refreshQq() {
+        TextView tv = findViewById(R.id.txtQqState);
+        if (tv == null) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        if (now - NapCat.probedAt > 3000) {
+            NapCat.probedAt = now;              // 先占位，避免每 600ms 都压一个探测
+            bg.execute(NapCat::probe);
+        }
+        if (NapCat.webuiUp) {
+            tv.setText("在线 · WebUI " + NapCat.WEBUI_URL + "（点「扫码登录」打开）");
+            tv.setTextColor(getColor(R.color.ok));
+        } else {
+            tv.setText("没响应。装的话点「装 NapCat」；装好了没起来，去终端里启动一次。\n"
+                    + "装好后 NapCat 的 OneBot 正向 WS 在 " + NapCat.ONEBOT_URL);
+            tv.setTextColor(getColor(R.color.muted));
+        }
+    }
+
+    private void openWeb(String url, String title) {
+        try {
+            Intent intent = new Intent(this, PanelActivity.class);
+            intent.putExtra(PanelActivity.EXTRA_URL, url);
+            intent.putExtra(PanelActivity.EXTRA_TITLE, title);
+            startActivity(intent);
+        } catch (Exception e) {
+            toast("打不开内置浏览器：" + e.getMessage());
+        }
     }
 
     private void openPanelInApp() {
