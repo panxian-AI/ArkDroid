@@ -479,6 +479,14 @@
                 </LinearLayout>
 
                 <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnQqStart"
+                    style="@style/BtnMain"
+                    android:layout_width="match_parent"
+                    android:layout_height="42dp"
+                    android:layout_marginTop="8dp"
+                    android:text="启动（QQ 无头 + ArkLink）" />
+
+                <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnQqFill"
                     style="@style/BtnGhost"
                     android:layout_width="match_parent"
@@ -491,7 +499,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
-                    android:text="装的是 NapCat 官方 Termux 脚本，跑在 Termux 原生环境里（不占 proot）。它要下 QQ 的 arm64 包（约 200 MB），建议挂 WiFi；装完在 WebUI 里登录一次，之后开机自动连。" />
+                    android:text="装的是 QQ 官方 arm64 包（跑在 proot 的 Xvfb 无头里）+ 你提供的 NapCat 压缩包 + ArkLink 翻译层，合计约 250 MB，建议挂 WiFi。装完点「启动」→「扫码登录」，在 WebUI 网络配置里新建 Milky 服务器（127.0.0.1:3000），最后点「填本机地址」。" />
 
                 <TextView
                     android:id="@+id/txtQqHint"
