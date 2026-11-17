@@ -24,6 +24,21 @@
 `astr` 命令：`start` / `stop` / `status` / `log` / `creds` / `resetpw` / `shell` / `run`。
 面板密码在 AstrBot 4.30+ 是哈希存储、读不回明文；界面上有「重置面板密码」按钮，走 `astr resetpw`。
 
+**3. 本机 QQ 模式（0.3.0 起）—— 一台手机就够，不用电脑**
+
+如果不想开电脑跑协议端，直接让手机自己当协议端：
+
+1. 「本机 QQ（NapCat）」卡 → 「**装 NapCat**」（走 NapCat 官方 Termux 脚本，会下 QQ 的 arm64 包装进去，约 200 MB）
+2. 装完点「**扫码登录**」，在 WebUI 里登录 QQ
+3. 点「**把中继地址填成本机 127.0.0.1:3001**」，中继就改连手机里的 NapCat
+4. 剩下照第 4 步装 AstrBot 即可
+
+链路：`NapCat(手机) → 127.0.0.1:3001 → ArkBridge → 127.0.0.1:6199 → AstrBot(手机)`，全程本机。
+
+QQ 的 arm64 安装包（`linuxqq_3.2.34-53644_arm64.deb`，SHA-256 固定）放在
+[ArkLink 的 qq-3.2.34-arm64](https://github.com/panxian-AI/ArkLink/releases/tag/qq-3.2.34-arm64)，
+不依赖腾讯随时会变的下载地址。注意 ArkLink 里那个 `qq-3.2.28` 是 **amd64**，只能给电脑用。
+
 ## 已知限制（说清楚，不粉饰）
 
 - **命令输出是跑完才回来**：Termux 的 `RUN_COMMAND` 没有真正的流式管道，ArkDroid 是把输出落文件再回传，所以长命令要等结束才看到结果。
