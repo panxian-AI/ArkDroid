@@ -1,0 +1,16 @@
+# 行尾统一成 LF：termux/install.sh 会被推进手机里的 Termux 跑，
+# CRLF 会让 bash 报 "bad interpreter: /data/data/com.termux/files/usr/bin/bash^M"
+* text=auto eol=lf
+
+*.sh      text eol=lf
+*.py      text eol=lf
+*.java    text eol=lf
+*.xml     text eol=lf
+*.json    text eol=lf
+*.yml     text eol=lf
+*.md      text eol=lf
+*.toml    text eol=lf
+gradlew   text eol=lf
+*.bat     text eol=crlf
+*.jar     binary
+*.apk     binary
