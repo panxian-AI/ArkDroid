@@ -75,8 +75,5 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: app/build/outputs/apk/debug/app-debug.apk
-          body: |
-            ArkDroid ${{ github.ref_name }}
-
-            debug 包已签名，直接装；release 包未签名（需要自己的 keystore）。
-            安装前建议先在 Termux 里跑一次 `termux-setup-storage`。
+          body_path: RELEASE.md
+          overwrite_files: true
