@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/scroller"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/bg"
@@ -15,13 +16,32 @@
         android:paddingEnd="18dp"
         android:paddingBottom="28dp">
 
-        <TextView
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="ArkDroid"
-            android:textColor="@color/text"
-            android:textSize="26sp"
-            android:textStyle="bold" />
+            android:baselineAligned="true"
+            android:gravity="bottom"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="ArkDroid"
+                android:textColor="@color/text"
+                android:textSize="26sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/txtVersion"
+                style="@style/Hint"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:gravity="end"
+                android:paddingBottom="4dp"
+                android:text="v0.2.1" />
+        </LinearLayout>
 
         <TextView
             style="@style/Hint"
@@ -78,8 +98,74 @@
                 android:textSize="12sp" />
         </LinearLayout>
 
+        <!-- ============================ 去哪 ============================ -->
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/navBridge"
+                    style="@style/BtnNav"
+                    android:layout_width="wrap_content"
+                    android:layout_height="38dp"
+                    android:text="中继" />
+
+                <Space
+                    android:layout_width="8dp"
+                    android:layout_height="1dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/navDl"
+                    style="@style/BtnNav"
+                    android:layout_width="wrap_content"
+                    android:layout_height="38dp"
+                    android:text="下载" />
+
+                <Space
+                    android:layout_width="8dp"
+                    android:layout_height="1dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/navAstr"
+                    style="@style/BtnNav"
+                    android:layout_width="wrap_content"
+                    android:layout_height="38dp"
+                    android:text="AstrBot" />
+
+                <Space
+                    android:layout_width="8dp"
+                    android:layout_height="1dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/navTerm"
+                    style="@style/BtnNav"
+                    android:layout_width="wrap_content"
+                    android:layout_height="38dp"
+                    android:text="终端" />
+
+                <Space
+                    android:layout_width="8dp"
+                    android:layout_height="1dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/navPanel"
+                    style="@style/BtnNav"
+                    android:layout_width="wrap_content"
+                    android:layout_height="38dp"
+                    android:text="浏览器" />
+            </LinearLayout>
+        </HorizontalScrollView>
+
         <!-- ============================ 中继 ============================ -->
         <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardBridge"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
@@ -323,6 +409,7 @@
 
         <!-- ============================ 内置下载 ============================ -->
         <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardDl"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="14dp"
@@ -420,6 +507,7 @@
 
         <!-- ============================ AstrBot ============================ -->
         <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardAstr"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="14dp"
@@ -556,6 +644,7 @@
 
         <!-- ============================ 终端 ============================ -->
         <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardTerm"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="14dp"
