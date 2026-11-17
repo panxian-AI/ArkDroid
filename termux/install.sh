@@ -431,10 +431,15 @@ start() {
   if running; then echo "已经在跑了（pid $(cat "$PID")）"; return 0; fi
   : > "$LOG"
   nohup "$STATE/proot-run.sh" /bin/bash -c '
-Xvfb :20 -screen 0 720x1280x24 -nolisten tcp >/dev/null 2>&1 &
-sleep 1
-export DISPLAY=:20
-exec dbus-run-session -- /opt/QQ/qq --no-sandbox --disable-gpu --disable-dev-shm-usage --in-process-gpu
+cd /root
+pgrep -x Xvfb >/dev/null || { Xvfb :1 -screen 0 1280x720x16 -nolisten tcp >/root/.arkdroid/xvfb.log 2>&1 & }
+sleep 2
+export DISPLAY=:1 HOME=/root
+exec /opt/QQ/qq --no-sandbox \
+  --disable-gpu \
+  --disable-software-rasterizer \
+  --disable-gpu-compositing \
+  --disable-dev-shm-usage
   ' >> "$LOG" 2>&1 &
   echo $! > "$PID"
   echo "已启动（pid $(cat "$PID")）。首次登录：浏览器开 http://127.0.0.1:6099/webui 扫码"
@@ -445,7 +450,7 @@ exec dbus-run-session -- /opt/QQ/qq --no-sandbox --disable-gpu --disable-dev-shm
 stop() {
   if running; then kill "$(cat "$PID")" 2>/dev/null || true; rm -f "$PID"; fi
   pkill -f "/opt/QQ/qq" 2>/dev/null || true
-  pkill -f "Xvfb :20" 2>/dev/null || true
+  pkill -f "Xvfb :1" 2>/dev/null || true
   echo "已停止"
 }
 
