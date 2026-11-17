@@ -9,8 +9,8 @@ android {
         applicationId "ai.panxian.arkdroid"
         minSdk 24
         targetSdk 34
-        versionCode 1
-        versionName "0.1.0"
+        versionCode 2
+        versionName "0.2.0"
 
         ndk {
             // 手机几乎都是 arm64；x86_64 留给模拟器。
@@ -74,4 +74,22 @@ android {
 dependencies {
     implementation "androidx.appcompat:appcompat:1.7.0"
     implementation "com.google.android.material:material:1.12.0"
+}
+
+// 组件清单只有一份（dist/manifest.json），构建时同步进 assets，避免两处漂移
+def syncManifest = tasks.register("syncManifest", Copy) {
+    from rootProject.file("dist/manifest.json")
+    into layout.projectDirectory.dir("src/main/assets")
+}
+
+// Termux 侧脚本也只有一份（termux/），同上
+def syncTermux = tasks.register("syncTermux", Copy) {
+    from rootProject.file("termux")
+    into layout.projectDirectory.dir("src/main/assets/termux")
+}
+
+tasks.configureEach { task ->
+    if (task.name == "preBuild") {
+        task.dependsOn(syncManifest, syncTermux)
+    }
 }

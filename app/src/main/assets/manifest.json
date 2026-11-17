@@ -1,0 +1,50 @@
+{
+  "version": 3,
+  "updated": "2026-11-18",
+  "note": "App 会并发测速后挑最快的镜像下载；改这个文件不用重发 APK（App 启动时会尝试拉一次线上的）。",
+  "components": [
+    {
+      "id": "termux",
+      "title": "Termux",
+      "desc": "AstrBot 的运行环境（arm64）",
+      "file": "termux.apk",
+      "kind": "apk",
+      "size": 35106607,
+      "sha256": "72fdb596045116bf5ba1b5bdf5b26fddb9acc0bd074ad9f2da9eb0ae85e83a4e",
+      "mirrors": [
+        "https://ghfast.top/https://github.com/termux/termux-app/releases/download/v0.118.3/termux-app_v0.118.3%2Bgithub-debug_arm64-v8a.apk",
+        "https://gh-proxy.com/https://github.com/termux/termux-app/releases/download/v0.118.3/termux-app_v0.118.3%2Bgithub-debug_arm64-v8a.apk",
+        "https://github.com/termux/termux-app/releases/download/v0.118.3/termux-app_v0.118.3%2Bgithub-debug_arm64-v8a.apk"
+      ]
+    },
+    {
+      "id": "rootfs",
+      "title": "Ubuntu 24.04 根文件系统",
+      "desc": "AstrBot 跑在里面（proot，无需 root）",
+      "file": "ubuntu-rootfs.tar.gz",
+      "kind": "tar",
+      "size": 29936675,
+      "sha256": "a91d5a93010193712d346d761372b7c9db6dfcf093893161c64ca107f05914f2",
+      "mirrors": [
+        "https://mirrors.tuna.tsinghua.edu.cn/ubuntu-cdimage/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.5-base-arm64.tar.gz",
+        "https://mirrors.aliyun.com/ubuntu-cdimage/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.5-base-arm64.tar.gz",
+        "https://mirrors.ustc.edu.cn/ubuntu-cdimage/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.5-base-arm64.tar.gz",
+        "https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.5-base-arm64.tar.gz"
+      ]
+    },
+    {
+      "id": "astrbot",
+      "title": "AstrBot 源码",
+      "desc": "跟着 master 走，装了可以再更新",
+      "file": "astrbot.tar.gz",
+      "kind": "tar",
+      "size": 9136842,
+      "sha256": "",
+      "mirrors": [
+        "https://gh-proxy.com/https://codeload.github.com/AstrBotDevs/AstrBot/tar.gz/refs/heads/master",
+        "https://ghfast.top/https://codeload.github.com/AstrBotDevs/AstrBot/tar.gz/refs/heads/master",
+        "https://codeload.github.com/AstrBotDevs/AstrBot/tar.gz/refs/heads/master"
+      ]
+    }
+  ]
+}

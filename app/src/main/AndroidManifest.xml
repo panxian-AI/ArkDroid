@@ -9,6 +9,8 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- 下好 Termux 的 APK 后拉起系统安装器 -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- 让 Termux 接受本 App 发过去的命令 -->
     <uses-permission android:name="com.termux.permission.RUN_COMMAND" />
 
@@ -43,6 +45,25 @@
             android:name=".BridgeService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+
+        <!-- 内置浏览器：AstrBot 面板 -->
+        <activity
+            android:name=".PanelActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:label="AstrBot 面板"
+            android:theme="@style/AppTheme" />
+
+        <!-- 把自己下好的 APK 交给系统安装器 -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
         <receiver
             android:name=".BootReceiver"

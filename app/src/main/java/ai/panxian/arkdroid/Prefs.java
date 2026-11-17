@@ -31,6 +31,16 @@ final class Prefs {
 
     void setAutostart(boolean value) { sp.edit().putBoolean("autostart", value).apply(); }
 
+    /** 本地文件服务的路径口令：别的 App 猜不到，外网也连不上（只绑回环）。 */
+    String localToken() {
+        String token = sp.getString("local_token", "");
+        if (token == null || token.isEmpty()) {
+            token = LocalServer.newToken();
+            sp.edit().putString("local_token", token).apply();
+        }
+        return token;
+    }
+
     void save(String arklink, String astrbot, String selfId, String arklinkToken, String astrbotToken) {
         sp.edit()
                 .putString("arklink", arklink.trim())
