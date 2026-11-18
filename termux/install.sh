@@ -204,69 +204,85 @@ gh_urls() { # $1=文件名 → 依次输出 gh-proxy / ghfast / 直连
   echo "$GH_DIST/$1"
 }
 
+# 完整性快检：gzip 结构 / zip 结构 / deb 的 ar 头。缓存命中就不再下载。
+cache_ok() { # $1=文件路径
+  [ -s "$1" ] || return 1
+  case "$1" in
+    *.tar.gz|*.tgz) gzip -t "$1" 2>/dev/null ;;
+    *.zip)          unzip -tqq "$1" >/dev/null 2>&1 ;;
+    *.deb)
+      if command -v dpkg-deb >/dev/null 2>&1; then
+        dpkg-deb -I "$1" >/dev/null 2>&1
+      else
+        [ "$(head -c 7 "$1" 2>/dev/null)" = '!<arch>' ]
+      fi ;;
+    *) return 0 ;;
+  esac
+}
+
 fetch_pkg() { # $1=文件名 $2=落地路径  $3=失败是否致命（die|warn），默认 die
-  local name="$1" dest="$2" fatal="${3:-die}"
-  if [ -n "$LOCAL" ] && http GET "$LOCAL/f/$name" > "$dest" && [ -s "$dest" ]; then
+  local name="$1" dest="$2" fatal="${3:-die}" u urls try
+  # ① 本地已有完好缓存 → 直接用，不下载
+  if cache_ok "$dest"; then
+    ok "已有缓存 $dest（$(du -h "$dest" | cut -f1)），跳过下载"
+    return 0
+  fi
+  # ② App 下载卡下好的文件（走回环）
+  if [ -n "$LOCAL" ] && http GET "$LOCAL/f/$name" > "$dest" && cache_ok "$dest"; then
     ok "从 App 取到 $name（$(du -h "$dest" | cut -f1)）"
     return 0
   fi
   case "$name" in
     ubuntu-rootfs.tar.gz)
-      for u in $(gh_urls ubuntu-rootfs.tar.gz) \
-        "https://mirrors.tuna.tsinghua.edu.cn/ubuntu-cdimage/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.5-base-arm64.tar.gz" \
-        "https://mirrors.aliyun.com/ubuntu-cdimage/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.5-base-arm64.tar.gz"
-      do
-        if curl -fsSL -m 1800 -o "$dest" "$u"; then
-          ok "自己下到 rootfs（$(echo "$u" | cut -d/ -f3)）"
-          return 0
-        fi
-      done
+      urls="$(gh_urls ubuntu-rootfs.tar.gz)
+        https://mirrors.tuna.tsinghua.edu.cn/ubuntu-cdimage/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.5-base-arm64.tar.gz
+        https://mirrors.aliyun.com/ubuntu-cdimage/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.5-base-arm64.tar.gz"
       ;;
     astrbot.tar.gz)
-      for u in $(gh_urls astrbot.tar.gz) \
-        "https://gh-proxy.com/https://codeload.github.com/AstrBotDevs/AstrBot/tar.gz/refs/heads/master"
-      do
-        if curl -fsSL -m 1800 -o "$dest" "$u"; then
-          ok "自己下到 AstrBot 源码（$(echo "$u" | cut -d/ -f3)）"
-          return 0
-        fi
-      done
+      urls="$(gh_urls astrbot.tar.gz)
+        https://gh-proxy.com/https://codeload.github.com/AstrBotDevs/AstrBot/tar.gz/refs/heads/master"
       ;;
     linuxqq_arm64.deb)
-      for u in \
-        "https://gh-proxy.com/https://github.com/panxian-AI/ArkLink/releases/download/qq-3.2.34-arm64/linuxqq_3.2.34-53644_arm64.deb" \
-        "https://ghfast.top/https://github.com/panxian-AI/ArkLink/releases/download/qq-3.2.34-arm64/linuxqq_3.2.34-53644_arm64.deb" \
-        "https://github.com/panxian-AI/ArkLink/releases/download/qq-3.2.34-arm64/linuxqq_3.2.34-53644_arm64.deb"
-      do
-        if curl -fsSL -m 1800 -o "$dest" "$u"; then
-          ok "自己下到 QQ arm64（$(echo "$u" | cut -d/ -f3)）"
-          return 0
-        fi
-      done
+      urls="https://gh-proxy.com/https://github.com/panxian-AI/ArkLink/releases/download/qq-3.2.34-arm64/linuxqq_3.2.34-53644_arm64.deb
+        https://ghfast.top/https://github.com/panxian-AI/ArkLink/releases/download/qq-3.2.34-arm64/linuxqq_3.2.34-53644_arm64.deb
+        https://github.com/panxian-AI/ArkLink/releases/download/qq-3.2.34-arm64/linuxqq_3.2.34-53644_arm64.deb"
       ;;
     napcat.zip)
-      for u in \
-        "https://gh-proxy.com/https://github.com/panxian-AI/ArkLink/releases/download/napcat-shell/NapCat.Shell.zip" \
-        "https://ghfast.top/https://github.com/panxian-AI/ArkLink/releases/download/napcat-shell/NapCat.Shell.zip" \
-        "https://github.com/panxian-AI/ArkLink/releases/download/napcat-shell/NapCat.Shell.zip"
-      do
-        if curl -fsSL -m 1800 -o "$dest" "$u"; then
-          ok "自己下到 NapCat（$(echo "$u" | cut -d/ -f3)）"
-          return 0
-        fi
-      done
+      urls="https://gh-proxy.com/https://github.com/panxian-AI/ArkLink/releases/download/napcat-shell/NapCat.Shell.zip
+        https://ghfast.top/https://github.com/panxian-AI/ArkLink/releases/download/napcat-shell/NapCat.Shell.zip
+        https://github.com/panxian-AI/ArkLink/releases/download/napcat-shell/NapCat.Shell.zip"
       ;;
     arklink.tar.gz)
-      for u in $(gh_urls arklink.tar.gz) \
-        "https://gh-proxy.com/https://codeload.github.com/panxian-AI/ArkLink/tar.gz/refs/heads/main"
-      do
-        if curl -fsSL -m 1800 -o "$dest" "$u"; then
-          ok "自己下到 ArkLink 源码（$(echo "$u" | cut -d/ -f3)）"
+      urls="$(gh_urls arklink.tar.gz)
+        https://gh-proxy.com/https://codeload.github.com/panxian-AI/ArkLink/tar.gz/refs/heads/main"
+      ;;
+    *) urls="" ;;
+  esac
+  # ③ 断点续传下载：每个镜像最多试 3 次，断线从已有字节继续；下完做完整性校验
+  for u in $urls; do
+    for try in 1 2 3; do
+      if curl -fsSL -C - -m 1800 -o "$dest" "$u"; then
+        if cache_ok "$dest"; then
+          ok "下到 $name（$(du -h "$dest" | cut -f1)，来自 $(echo "$u" | cut -d/ -f3)）"
           return 0
         fi
-      done
-      ;;
-  esac
+        echo "  下载完了但完整性校验不过（可能是镜像坏包），换来源重来"
+        rm -f "$dest"
+        continue
+      fi
+      rc=$?
+      # 416/Range 错误：可能其实已下完整，校验一下
+      if [ "$rc" = "22" ] || [ "$rc" = "33" ]; then
+        if cache_ok "$dest"; then
+          ok "$name 已完整（断点续传收尾）"
+          return 0
+        fi
+        rm -f "$dest"
+      fi
+      echo "  第 $try 次没下完（已有 $(du -h "$dest" 2>/dev/null | cut -f1)），断点续传重试"
+      sleep 2
+    done
+  done
   if [ "$fatal" = "die" ]; then
     die "拿不到 $name（App 里先下载对应组件，或检查网络）"
   else
@@ -293,7 +309,7 @@ else
   if [ ! -f "$ROOTFS/etc/os-release" ] || [ ! -x "$ROOTFS/bin/bash" ]; then
     die "解压失败（rootfs 关键文件缺失），包可能是坏的"
   fi
-  rm -f "$TMP"
+  # tarball 留着（30MB）：删掉 rootfs 重装时不用重新下载
   ok "解好了：$ROOTFS"
 fi
 
@@ -441,7 +457,7 @@ uv --version
     rm -rf "$ROOTFS/root/AstrBot.new"
     mkdir -p "$ROOTFS/root/AstrBot.new"
     tar xzf "$TMP" -C "$ROOTFS/root/AstrBot.new" --strip-components=1 || die "解压 AstrBot 失败"
-    rm -f "$TMP"
+    # tarball 留着（16MB）：下次「安装 / 更新」重新解包时直接复用，不重新下载
     if [ -d "$ROOTFS/root/AstrBot/data" ]; then
       cp -a "$ROOTFS/root/AstrBot/data" "$ROOTFS/root/AstrBot.new/data"
     fi
@@ -602,7 +618,7 @@ else
     rm -rf "$ROOTFS/root/ArkLink"
     mkdir -p "$ROOTFS/root/ArkLink"
     tar xzf "$TMP" -C "$ROOTFS/root/ArkLink" --strip-components=1 || die "解压 ArkLink 失败"
-    rm -f "$TMP"
+    # tarball 留着复用
     ok "ArkLink 源码就位"
   else
     ok "已有 ArkLink，复用"
