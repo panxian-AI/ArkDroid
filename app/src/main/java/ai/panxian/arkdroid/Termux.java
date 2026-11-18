@@ -7,8 +7,11 @@ import android.util.Log;
 
 import androidx.core.content.FileProvider;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 
 /**
  * 和 Termux 打交道：发命令，并把输出捞回 App 的终端窗口。
@@ -17,9 +20,9 @@ import java.io.IOException;
  * {@code allow-external-apps} 授权已内置，装上即用。官方 Termux 也能用，
  * 但得手动在 {@code ~/.termux/termux.properties} 里加 {@code allow-external-apps=true}。
  *
- * <p>输出怎么回来：Termux 执行 {@code ( 命令 ) 2>&1 | curl -X POST ... $ARKDROID_LOCAL/p/term}，
- * 也就是把 stdout/stderr 直接 POST 到 App 起的回环服务上。curl 从管道读时用 chunked，
- * 所以 App 那边能一边跑一边看到输出，不是等结束了才刷一大坨。
+ * <p>输出怎么回来：把 stdout/stderr POST 到 App 起的回环服务上。回传优先用 curl；
+ * curl 要到 install.sh 第 1 步才装上，在那之前用 arknet.sh（bash /dev/tcp 原生 HTTP）兜底——
+ * Termux bootstrap 必有 bash，未必有 curl，没这个兜底整个回传链会鸡生蛋地断掉。
  */
 final class Termux {
 
@@ -28,6 +31,21 @@ final class Termux {
     private static final String HOME = "/data/data/com.termux/files/home";
 
     private Termux() {
+    }
+
+    /** 读 assets 里的 Termux 侧脚本（构建时由 syncTermux 从仓库 termux/ 目录同步）。 */
+    static String readAsset(Context ctx, String name) {
+        try (InputStream in = ctx.getAssets().open(name);
+             ByteArrayOutputStream buf = new ByteArrayOutputStream()) {
+            byte[] chunk = new byte[8192];
+            int n;
+            while ((n = in.read(chunk)) > 0) {
+                buf.write(chunk, 0, n);
+            }
+            return new String(buf.toByteArray(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            return null;
+        }
     }
 
     static boolean installed(Context ctx) {
@@ -98,8 +116,12 @@ final class Termux {
                 + " mkdir -p ~/.arkdroid"
                 + "; OUT=$HOME/.arkdroid/term.out"
                 + "; ( " + command + " ) > \"$OUT\" 2>&1"
-                + "; curl -sS -m " + timeoutSec
-                + " -X POST --data-binary @\"$OUT\" \"$ARKDROID_LOCAL/p/term\""
+                // 回传优先 curl，没有就 arknet（bash /dev/tcp）兜底
+                + "; if command -v curl >/dev/null 2>&1; then"
+                + " curl -sS -m " + timeoutSec + " -X POST --data-binary @\"$OUT\" \"$ARKDROID_LOCAL/p/term\";"
+                + " elif [ -f \"$HOME/.arkdroid/arknet.sh\" ]; then"
+                + " bash \"$HOME/.arkdroid/arknet.sh\" POST \"$ARKDROID_LOCAL/p/term\" - < \"$OUT\";"
+                + " else cat \"$OUT\"; fi"
                 + "; rm -f \"$OUT\"";
     }
 
@@ -114,14 +136,32 @@ final class Termux {
             LogBus.append("本地服务起不来，没法把安装包递给 Termux：" + e.getMessage());
             return false;
         }
+        // arknet.sh 先落进去：没有它，curl 没装好之前 install.sh 既下不下来也回传不了
+        String arknet = readAsset(ctx, "termux/arknet.sh");
+        if (arknet == null) {
+            LogBus.append("arknet.sh 没打进 APK（构建问题），回传兜底不可用");
+            return false;
+        }
         String cmd = local
                 + " mkdir -p ~/.arkdroid"
-                + " && curl -fsSL -o ~/.arkdroid/install.sh \"$ARKDROID_LOCAL/a/termux/install.sh\""
-                // 后台跑：起前台会话要 Termux 有“显示在其他应用上层”权限，多数人没给
-                + " && ( bash ~/.arkdroid/install.sh 2>&1 | tee -a ~/.arkdroid/install.log"
-                // 输出逐行实时推回 App（回环很便宜），App 终端窗里就能看着装
-                + " | while IFS= read -r l; do curl -sS -m 10 -X POST"
-                + " --data-binary \"$l\" \"$ARKDROID_LOCAL/p/term\" >/dev/null 2>&1 || true; done )";
+                + " && cat > ~/.arkdroid/arknet.sh <<'ARKNET_EOF'\n" + arknet + "\nARKNET_EOF\n"
+                // App 刚启动时本地服务可能还没就绪：重试几次直到拿到非空脚本
+                + " for i in 1 2 3 4 5; do"
+                + " bash ~/.arkdroid/arknet.sh GET \"$ARKDROID_LOCAL/a/termux/install.sh\""
+                + " > ~/.arkdroid/install.sh 2>/dev/null;"
+                + " [ -s ~/.arkdroid/install.sh ] && break;"
+                + " curl -fsSL -o ~/.arkdroid/install.sh \"$ARKDROID_LOCAL/a/termux/install.sh\" 2>/dev/null;"
+                + " [ -s ~/.arkdroid/install.sh ] && break; sleep 2; done"
+                + " ; echo \"=== install.sh 启动，输出开始实时回传 ===\""
+                + " ; bash ~/.arkdroid/arknet.sh POST \"$ARKDROID_LOCAL/p/term\" \"=== install.sh 启动 ===\" >/dev/null 2>&1 || true"
+                + " ; ( bash ~/.arkdroid/install.sh 2>&1 | tee -a ~/.arkdroid/install.log"
+                // 输出逐行实时推回 App；curl 没有时走 arknet
+                + " | while IFS= read -r l; do"
+                + " if command -v curl >/dev/null 2>&1; then"
+                + " curl -sS -m 10 -X POST --data-binary \"$l\" \"$ARKDROID_LOCAL/p/term\" >/dev/null 2>&1 || true;"
+                + " else"
+                + " bash ~/.arkdroid/arknet.sh POST \"$ARKDROID_LOCAL/p/term\" \"$l\" >/dev/null 2>&1 || true;"
+                + " fi; done )";
         LogBus.append("开始安装：进度条在上面，实时输出进「终端」，Termux 窗口不用盯着");
         return run(ctx, cmd, true);
     }

@@ -36,10 +36,29 @@ for arg in "$@"; do
   esac
 done
 
-# 进度上报：把步骤实时推给 App（p/prog），失败不影响安装
+# 进度上报：把步骤实时推给 App（p/prog），失败不影响安装。
+# curl 是第 1 步才装的，之前全靠 arknet.sh（bash /dev/tcp）兜底，两条路都不通才算真失败
+ARKNET="$HOME/.arkdroid/arknet.sh"
+http() { # http METHOD URL [body] ；GET 的响应打到 stdout（调用处 > 重定向）
+  if command -v curl >/dev/null 2>&1; then
+    case "$1" in
+      POST) curl -sS -m 15 -X POST --data-binary "${3:-$(cat)}" "$2" 2>/dev/null || true ;;
+      *)    curl -fsSL -m 1800 "$2" ;;
+    esac
+  else
+    if [ -f "$ARKNET" ]; then
+      case "$1" in
+        POST) bash "$ARKNET" "$@" >/dev/null 2>&1 || true ;;
+        *)    bash "$ARKNET" "$@" ;;
+      esac
+    else
+      [ "$1" = POST ] && return 0 || return 1
+    fi
+  fi
+}
 report_prog() {
   [ -n "$ARKDROID_LOCAL" ] || return 0
-  curl -sS -m 10 -X POST --data-binary "$*" "$ARKDROID_LOCAL/p/prog" >/dev/null 2>&1 || true
+  http POST "$ARKDROID_LOCAL/p/prog" "$*"
 }
 step() {
   printf '\n\033[1;34m==> %s\033[0m\n' "$*"
@@ -114,7 +133,7 @@ ok "proot / tar / curl 就绪"
 # ------------------------------------------------------------------ 取包
 fetch_pkg() { # $1=文件名 $2=落地路径  $3=失败是否致命（die|warn），默认 die
   local name="$1" dest="$2" fatal="${3:-die}"
-  if [ -n "$LOCAL" ] && curl -fsSL -m 1800 -o "$dest" "$LOCAL/f/$name"; then
+  if [ -n "$LOCAL" ] && http GET "$LOCAL/f/$name" > "$dest" && [ -s "$dest" ]; then
     ok "从 App 取到 $name（$(du -h "$dest" | cut -f1)）"
     return 0
   fi

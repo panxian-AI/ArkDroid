@@ -60,13 +60,23 @@ final class NapCat {
         LogBus.append("装本机 QQ：QQ deb + NapCat 注入 + ArkLink（install.sh --qq-only）");
         return Termux.send(ctx,
                 "mkdir -p ~/.arkdroid"
-                        + "; curl -fsSL -m 120 -o ~/.arkdroid/install.sh \"$ARKDROID_LOCAL/a/termux/install.sh\""
-                        + " || true"
+                        // 装 QQ 时 curl 一般已就位（第 1 步装的），没有就 arknet 兜底
+                        + "; for i in 1 2 3; do"
+                        + " if command -v curl >/dev/null 2>&1; then"
+                        + " curl -fsSL -m 120 -o ~/.arkdroid/install.sh \"$ARKDROID_LOCAL/a/termux/install.sh\";"
+                        + " else"
+                        + " bash ~/.arkdroid/arknet.sh GET \"$ARKDROID_LOCAL/a/termux/install.sh\" > ~/.arkdroid/install.sh;"
+                        + " fi"
+                        + " && [ -s ~/.arkdroid/install.sh ] && break; sleep 2; done"
                         + "; echo \"--- 开始：本机 QQ + ArkLink ---\""
                         // 输出逐行实时推回 App，不等装完
                         + "; ( bash ~/.arkdroid/install.sh --qq-only 2>&1 | tee -a ~/.arkdroid/qq-install.log"
-                        + " | while IFS= read -r l; do curl -sS -m 10 -X POST"
-                        + " --data-binary \"$l\" \"$ARKDROID_LOCAL/p/term\" >/dev/null 2>&1 || true; done )"
+                        + " | while IFS= read -r l; do"
+                        + " if command -v curl >/dev/null 2>&1; then"
+                        + " curl -sS -m 10 -X POST --data-binary \"$l\" \"$ARKDROID_LOCAL/p/term\" >/dev/null 2>&1 || true;"
+                        + " elif [ -f \"$HOME/.arkdroid/arknet.sh\" ]; then"
+                        + " bash ~/.arkdroid/arknet.sh POST \"$ARKDROID_LOCAL/p/term\" \"$l\" >/dev/null 2>&1 || true;"
+                        + " fi; done )"
                         + "; echo \"--- 结束，退出码 $? ---\"",
                 3600);
     }
