@@ -11,8 +11,8 @@ android {
         // 28 是刻意的：Android 10+（W^X）禁止 App 执行私有目录里的二进制，
         // 而嵌入式 Termux 运行时必须 exec proot/bash。Termux 官方也钉在 28。
         targetSdk 28
-        versionCode 16
-        versionName "0.4.3"
+        versionCode 17
+        versionName "0.4.4"
 
         ndk {
             // 手机几乎都是 arm64；x86_64 留给模拟器。

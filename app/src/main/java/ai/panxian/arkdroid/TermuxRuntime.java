@@ -223,6 +223,11 @@ final class TermuxRuntime {
             LogBus.append("本地服务起不来：" + e.getMessage());
             return false;
         }
+        // proot 需要一个可写的临时目录放 glue rootfs；不 mkdir 它会直接罢工
+        File prootTmp = new File(ctx.getCacheDir(), "proot");
+        if (!prootTmp.isDirectory() && !prootTmp.mkdirs()) {
+            LogBus.append("建不了 proot 临时目录：" + prootTmp);
+        }
         ProcessBuilder pb = new ProcessBuilder(
                 new File(nativeBin(ctx), "proot").getAbsolutePath(),
                 "-0",
