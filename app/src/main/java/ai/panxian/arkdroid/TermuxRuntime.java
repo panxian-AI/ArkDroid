@@ -236,12 +236,18 @@ final class TermuxRuntime {
         env.put("PREFIX", GUEST_PREFIX);
         env.put("TMPDIR", GUEST_PREFIX + "/tmp");
         env.put("LANG", "en_US.UTF-8");
-        env.put("LD_PRELOAD", GUEST_PREFIX + "/lib/libtermux-exec.so");
+        // 不设 LD_PRELOAD：老版 libtermux-exec.so 在新 bootstrap 里已不存在，preload 缺库
+        // 会让 proot 自己都加载不起来（CANNOT LINK EXECUTABLE）。guest 内部的 shebang /
+        // 路径翻译由 proot 在 syscall 层完成，不需要 termux-exec。
         env.put("PROOT_LOADER", new File(nativeBin(ctx), "loader").getAbsolutePath());
         env.put("PROOT_LOADER32", new File(nativeBin(ctx), "loader32").getAbsolutePath());
         env.put("PROOT_TMP_DIR", new File(ctx.getCacheDir(), "proot").getAbsolutePath());
         env.put("PROOT_NO_SECCOMP", "1");
-        env.put("LD_LIBRARY_PATH", nativeBin(ctx).getAbsolutePath());
+        // proot 本体用 nativeBin 里的 libtalloc/libandroid-shmem；guest 里的 Termux
+        // 二进制（bash/curl/…）靠 $PREFIX/lib 找自己的依赖库（链接器的 open 会被
+        // proot 翻译到真实路径，所以 guest 前缀写在 host 环境里同样生效）
+        env.put("LD_LIBRARY_PATH",
+                nativeBin(ctx).getAbsolutePath() + ":" + GUEST_PREFIX + "/lib");
         env.put("ARKDROID_LOCAL", local);
         env.put("TERM", "xterm-256color");
         pb.directory(home(ctx));
