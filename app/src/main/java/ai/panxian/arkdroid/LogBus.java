@@ -73,12 +73,16 @@ final class LogBus {
     }
 
     private static void fire() {
-        for (Runnable listener : new ArrayList<>(LISTENERS)) {
-            try {
-                listener.run();
-            } catch (RuntimeException ignored) {
-                // UI 挂了不该影响日志写入
+        // append 可能来自后台线程（proot 输出、本地服务等），listener 会碰 UI，
+        // 必须切回主线程——否则 CalledFromWrongThreadException 被下面吞掉，日志不上屏
+        new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+            for (Runnable listener : new ArrayList<>(LISTENERS)) {
+                try {
+                    listener.run();
+                } catch (RuntimeException ignored) {
+                    // UI 挂了不该影响日志写入
+                }
             }
-        }
+        });
     }
 }

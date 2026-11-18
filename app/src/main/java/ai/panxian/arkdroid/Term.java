@@ -72,12 +72,17 @@ final class Term {
     }
 
     private static void fire() {
-        for (Runnable listener : new ArrayList<>(LISTENERS)) {
-            try {
-                listener.run();
-            } catch (RuntimeException ignored) {
-                // UI 出问题不该拖累终端
+        // append 可能来自 proot 输出的后台读取线程，listener 会碰 UI（setText），
+        // 必须切回主线程执行——之前直接在调用线程跑，CalledFromWrongThreadException
+        // 被 catch 吞掉，表现为命令的实时输出永远不上屏。
+        new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+            for (Runnable listener : new ArrayList<>(LISTENERS)) {
+                try {
+                    listener.run();
+                } catch (RuntimeException ignored) {
+                    // UI 出问题不该拖累终端
+                }
             }
-        }
+        });
     }
 }
