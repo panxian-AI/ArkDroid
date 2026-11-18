@@ -36,10 +36,18 @@ for arg in "$@"; do
   esac
 done
 
-step() { printf '\n\033[1;34m==> %s\033[0m\n' "$*"; }
+# 进度上报：把步骤实时推给 App（p/prog），失败不影响安装
+report_prog() {
+  [ -n "$ARKDROID_LOCAL" ] || return 0
+  curl -sS -m 10 -X POST --data-binary "$*" "$ARKDROID_LOCAL/p/prog" >/dev/null 2>&1 || true
+}
+step() {
+  printf '\n\033[1;34m==> %s\033[0m\n' "$*"
+  report_prog "$*"
+}
 ok()   { printf '\033[1;32m  ✓ %s\033[0m\n' "$*"; }
 warn() { printf '\033[1;33m  ! %s\033[0m\n' "$*"; }
-die()  { printf '\033[1;31m  ✗ %s\033[0m\n' "$*" >&2; exit 1; }
+die()  { printf '\033[1;31m  ✗ %s\033[0m\n' "$*" >&2; report_prog "done 安装中断：$*"; exit 1; }
 
 [ -d /data/data/com.termux ] || die "这个脚本要在 Termux 里跑"
 
@@ -559,3 +567,5 @@ cat <<'EOT'
 
 排障：qq log / arklink log / astr log；状态：qq status / arklink status / astr status
 EOT
+
+report_prog "done 全部装完了 ✓"

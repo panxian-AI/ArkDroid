@@ -67,6 +67,12 @@ public class MainActivity extends AppCompatActivity {
     private View cardAstr;
     private View cardTerm;
     private View cardQq;
+    private View cardProgress;
+    private ProgressBar progressInstall;
+    private TextView txtInstallStep;
+    private TextView txtInstallHint;
+    private android.widget.LinearLayout dlList;
+    private final java.util.Map<String, TextView> dlRows = new java.util.HashMap<>();
     private boolean welcomed;
     private boolean credsAuto;
     private boolean dlDoneNotice;
@@ -79,11 +85,23 @@ public class MainActivity extends AppCompatActivity {
             }
             String text = Term.text();
             if (!text.contentEquals(txtTerm.getText())) {
+                boolean bottom = atBottom(termScroll);
                 txtTerm.setText(text);
-                termScroll.post(() -> termScroll.fullScroll(View.FOCUS_DOWN));
+                if (bottom) {
+                    termScroll.post(() -> termScroll.fullScroll(View.FOCUS_DOWN));
+                }
             }
         }
     };
+
+    /** 用户停在底部附近才算"在看最新"，翻上去看历史就不动他的位置。 */
+    private boolean atBottom(ScrollView sv) {
+        if (sv == null || sv.getChildCount() == 0) {
+            return true;
+        }
+        int bottom = sv.getChildAt(0).getBottom();
+        return bottom - (sv.getHeight() + sv.getScrollY()) < 100;
+    }
 
     private final Runnable credsRefresh = new Runnable() {
         @Override
@@ -99,8 +117,11 @@ public class MainActivity extends AppCompatActivity {
         public void run() {
             String text = LogBus.text();
             if (!text.contentEquals(txtLog.getText())) {
+                boolean bottom = atBottom(logScroll);
                 txtLog.setText(text);
-                logScroll.post(() -> logScroll.fullScroll(View.FOCUS_DOWN));
+                if (bottom) {
+                    logScroll.post(() -> logScroll.fullScroll(View.FOCUS_DOWN));
+                }
             }
         }
     };
@@ -199,6 +220,20 @@ public class MainActivity extends AppCompatActivity {
         cardAstr = findViewById(R.id.cardAstr);
         cardTerm = findViewById(R.id.cardTerm);
         cardQq = findViewById(R.id.cardQq);
+        cardProgress = findViewById(R.id.cardProgress);
+        progressInstall = findViewById(R.id.progressInstall);
+        txtInstallStep = findViewById(R.id.txtInstallStep);
+        txtInstallHint = findViewById(R.id.txtInstallHint);
+        dlList = findViewById(R.id.dlList);
+
+        // 外层 NestedScrollView 会把触摸事件抢走，内层终端/日志就滑不动。
+        // 按到内层时告诉父级别拦截，事件继续正常分发。
+        View.OnTouchListener passThrough = (v, ev) -> {
+            v.getParent().requestDisallowInterceptTouchEvent(true);
+            return false;
+        };
+        termScroll.setOnTouchListener(passThrough);
+        logScroll.setOnTouchListener(passThrough);
     }
 
     /** 顶部导航：把对应卡片滚到可视区，别让人靠猜「功能在哪」。 */
@@ -258,9 +293,7 @@ public class MainActivity extends AppCompatActivity {
         swAutostart.setOnCheckedChangeListener((button, checked) -> prefs.setAutostart(checked));
 
         findViewById(R.id.btnDlAll).setOnClickListener(v -> startDownload(null));
-        findViewById(R.id.btnDlTermux).setOnClickListener(v -> startDownload(java.util.Collections.singletonList("termux")));
-        findViewById(R.id.btnDlRootfs).setOnClickListener(v -> startDownload(java.util.Collections.singletonList("rootfs")));
-        findViewById(R.id.btnDlAstrbot).setOnClickListener(v -> startDownload(java.util.Collections.singletonList("astrbot")));
+        buildDlList();
 
         findViewById(R.id.btnCreds).setOnClickListener(v -> readCreds());
         findViewById(R.id.btnResetPw).setOnClickListener(v -> askResetPassword());
@@ -372,7 +405,16 @@ public class MainActivity extends AppCompatActivity {
         if (!dlDoneNotice && Downloads.allReady(this)) {
             dlDoneNotice = true;
             jumpTo(cardAstr);
-            toast("三个包都下好了，点「装 Termux」继续");
+            toast("组件都下好了，点「装 Termux」继续");
+        }
+
+        // 安装进度条（install.sh 实时推的步骤）
+        boolean showProgress = InstallProgress.visible();
+        cardProgress.setVisibility(showProgress ? View.VISIBLE : View.GONE);
+        if (showProgress) {
+            progressInstall.setProgress(InstallProgress.percent());
+            txtInstallStep.setText(InstallProgress.line());
+            txtInstallHint.setText(InstallProgress.hint());
         }
     }
 
@@ -382,13 +424,57 @@ public class MainActivity extends AppCompatActivity {
             progressDl.setProgress(Downloads.percent());
             txtDlState.setText(Downloads.fractionText());
             txtDlState.setTextColor(getColor(R.color.brand));
-            return;
+        } else {
+            progressDl.setProgress(ready ? 100 : 0);
+            java.util.List<Catalog.Item> items = Catalog.items(this);
+            int ok = 0;
+            for (Catalog.Item it : items) {
+                if (it.ready(this)) {
+                    ok++;
+                }
+            }
+            txtDlState.setText(ready
+                    ? "全部 " + items.size() + " 个组件都下好了。下一步：装 Termux → 点「安装 / 更新」。"
+                    : (Downloads.lastError.isEmpty()
+                        ? "已就绪 " + ok + "/" + items.size() + " 个组件。点下面的行补下缺的，或点「一键下载全部」。"
+                        : "已就绪 " + ok + "/" + items.size() + " 个。\n" + Downloads.lastError));
+            txtDlState.setTextColor(getColor(ready ? R.color.ok : R.color.muted));
         }
-        progressDl.setProgress(ready ? 100 : 0);
-        txtDlState.setText(ready
-                ? "三个包都下好了（Termux / Ubuntu / AstrBot）。下一步：装 Termux → 点「安装 / 更新」。"
-                : Downloads.describe(this) + (Downloads.lastError.isEmpty() ? "" : "\n" + Downloads.lastError));
-        txtDlState.setTextColor(getColor(ready ? R.color.ok : R.color.muted));
+        // 每个组件一行：✓ 已就绪 / ○ 待下载 xx MB / ⏳ 下载中
+        String current = Downloads.busy ? Downloads.label : "";
+        for (java.util.Map.Entry<String, TextView> e : dlRows.entrySet()) {
+            Catalog.Item it = Catalog.find(this, e.getKey());
+            if (it == null) {
+                continue;
+            }
+            String status;
+            if (Downloads.busy && it.title.equals(current)) {
+                status = "⏳ " + Math.min(100, Downloads.percent()) + "%";
+            } else if (it.ready(this)) {
+                status = "✓ 已就绪";
+            } else {
+                status = "○ 待下载 " + it.sizeLabel();
+            }
+            e.getValue().setText(it.title + "  ·  " + status);
+        }
+    }
+
+    /** 下载卡的全组件清单：manifest 里有什么就列什么，点行下单个，一眼看出缺没缺。 */
+    private void buildDlList() {
+        java.util.List<Catalog.Item> items = Catalog.items(this);
+        dlList.removeAllViews();
+        dlRows.clear();
+        int padV = (int) (10 * getResources().getDisplayMetrics().density);
+        for (Catalog.Item it : items) {
+            TextView row = new TextView(this);
+            row.setPadding(0, padV, 0, padV);
+            row.setTextSize(13);
+            row.setTextColor(getColor(R.color.text));
+            row.setText(it.title);
+            row.setOnClickListener(v -> startDownload(java.util.Collections.singletonList(it.id)));
+            dlList.addView(row);
+            dlRows.put(it.id, row);
+        }
     }
 
     // ------------------------------------------------------------------ 动作

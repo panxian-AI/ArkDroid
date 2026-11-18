@@ -63,7 +63,10 @@ final class NapCat {
                         + "; curl -fsSL -m 120 -o ~/.arkdroid/install.sh \"$ARKDROID_LOCAL/a/termux/install.sh\""
                         + " || true"
                         + "; echo \"--- 开始：本机 QQ + ArkLink ---\""
-                        + "; ( bash ~/.arkdroid/install.sh --qq-only 2>&1 | tee -a ~/.arkdroid/qq-install.log )"
+                        // 输出逐行实时推回 App，不等装完
+                        + "; ( bash ~/.arkdroid/install.sh --qq-only 2>&1 | tee -a ~/.arkdroid/qq-install.log"
+                        + " | while IFS= read -r l; do curl -sS -m 10 -X POST"
+                        + " --data-binary \"$l\" \"$ARKDROID_LOCAL/p/term\" >/dev/null 2>&1 || true; done )"
                         + "; echo \"--- 结束，退出码 $? ---\"",
                 3600);
     }

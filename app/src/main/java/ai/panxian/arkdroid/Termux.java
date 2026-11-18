@@ -95,12 +95,13 @@ final class Termux {
         String cmd = local
                 + " mkdir -p ~/.arkdroid"
                 + " && curl -fsSL -o ~/.arkdroid/install.sh \"$ARKDROID_LOCAL/a/termux/install.sh\""
-                + " && ( bash ~/.arkdroid/install.sh 2>&1 | tee -a ~/.arkdroid/install.log )"
-                + "; curl -sS -m 7200 -X POST --data-binary @$HOME/.arkdroid/install.log"
-                + " \"$ARKDROID_LOCAL/p/term\"";
-        LogBus.append("开始安装：App 里下好的包走 127.0.0.1 递给 Termux，"
-                + "Termux 窗口里能看实时进度，装完这里会显示完整日志");
-        return run(ctx, cmd, false);
+                // 后台跑：起前台会话要 Termux 有“显示在其他应用上层”权限，多数人没给
+                + " && ( bash ~/.arkdroid/install.sh 2>&1 | tee -a ~/.arkdroid/install.log"
+                // 输出逐行实时推回 App（回环很便宜），App 终端窗里就能看着装
+                + " | while IFS= read -r l; do curl -sS -m 10 -X POST"
+                + " --data-binary \"$l\" \"$ARKDROID_LOCAL/p/term\" >/dev/null 2>&1 || true; done )";
+        LogBus.append("开始安装：进度条在上面，实时输出进「终端」，Termux 窗口不用盯着");
+        return run(ctx, cmd, true);
     }
 
     /** 跑 astr 子命令（start/stop/status/creds/log…），输出进终端。 */
@@ -144,8 +145,7 @@ final class Termux {
         } catch (Exception e) {
             Log.w("ArkDroid", "run command failed", e);
             LogBus.append("发送 Termux 命令失败：" + e.getMessage()
-                    + "（装官方 Termux 的话需要开 allow-external-apps，"
-                    + "或者卸掉改装 App 下载卡里的 ArkTerm）");
+                    + "（缺 com.termux.permission.RUN_COMMAND 授权的话，回到 App 等它弹权限框）");
             return false;
         }
     }

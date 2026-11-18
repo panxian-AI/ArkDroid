@@ -174,6 +174,56 @@
             </LinearLayout>
         </HorizontalScrollView>
 
+        <!-- 安装进度：install.sh 每步实时推上来，装 AstrBot / 装 QQ 都显示在这 -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardProgress"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:visibility="gone"
+            app:cardBackgroundColor="@color/surface"
+            app:cardCornerRadius="14dp"
+            app:cardElevation="0dp"
+            app:strokeColor="@color/brand"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:paddingTop="10dp"
+                android:paddingBottom="12dp">
+
+                <TextView
+                    android:id="@+id/txtInstallStep"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/brand"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <ProgressBar
+                    android:id="@+id/progressInstall"
+                    style="?android:attr/progressBarStyleHorizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="6dp"
+                    android:layout_marginTop="8dp"
+                    android:max="100"
+                    android:progress="0"
+                    android:progressTint="@color/brand" />
+
+                <TextView
+                    android:id="@+id/txtInstallHint"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:textColor="@color/muted"
+                    android:textSize="11sp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
         <!-- ============================ 中继 ============================ -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/cardBridge"
@@ -563,50 +613,18 @@
                     android:text="一键下载全部" />
 
                 <LinearLayout
+                    android:id="@+id/dlList"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:orientation="horizontal">
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnDlTermux"
-                        style="@style/BtnGhost"
-                        android:layout_width="0dp"
-                        android:layout_height="42dp"
-                        android:layout_weight="1"
-                        android:text="Termux" />
-
-                    <Space
-                        android:layout_width="8dp"
-                        android:layout_height="1dp" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnDlRootfs"
-                        style="@style/BtnGhost"
-                        android:layout_width="0dp"
-                        android:layout_height="42dp"
-                        android:layout_weight="1"
-                        android:text="Ubuntu" />
-
-                    <Space
-                        android:layout_width="8dp"
-                        android:layout_height="1dp" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnDlAstrbot"
-                        style="@style/BtnGhost"
-                        android:layout_width="0dp"
-                        android:layout_height="42dp"
-                        android:layout_weight="1"
-                        android:text="AstrBot" />
-                </LinearLayout>
+                    android:orientation="vertical" />
 
                 <TextView
                     style="@style/Hint"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:text="镜像清单在 dist/manifest.json，挂了会换下一个；下好的包只留在本机，安装时走 127.0.0.1 递给 Termux，不重复走流量。" />
+                    android:text="✓ = 已就绪；点任意一行单独下载那个包。镜像清单在 dist/manifest.json，挂了会换下一个；下好的包只留在本机，安装时走 127.0.0.1 递给 Termux。" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -878,7 +896,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:text="命令在 Termux 里跑，输出在结束时回到上面。要进 Ubuntu 就加前缀：astr run ls /root/AstrBot。常用：astr status、astr log、astr creds" />
+                    android:text="命令在 Termux 后台跑，安装类命令会把输出实时流回上面。要进 Ubuntu 就加前缀：astr run ls /root/AstrBot。常用：astr status、astr log、astr creds" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
