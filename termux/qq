@@ -12,6 +12,28 @@ start() {
     exit 1
   fi
   if running; then echo "已经在跑了（pid $(cat "$PID")）"; return 0; fi
+  # 依赖自愈：老安装可能缺 Electron 运行库（比如 libasound.so.2），缺就当场补，输出不吞
+  "$STATE/proot-run.sh" /bin/bash -c '
+  missing=0
+  for lib in libasound.so.2 libnss3.so; do
+    if ! ldconfig -p 2>/dev/null | grep -q "$lib "; then
+      echo "缺运行库：$lib"; missing=1
+    fi
+  done
+  if [ "$missing" = 1 ]; then
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update -qq >/dev/null 2>&1 || true
+    apt-get install -y -qq --no-install-recommends \
+      libasound2t64 libasound2 libnss3 \
+      libatk-bridge2.0-0t64 libatk1.0-0t64 libcups2t64 libdrm2 libgbm1 \
+      libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libatspi2.0-0t64 \
+      2>&1 | grep -iv "^(Reading\|Selecting\|Preparing\|Unpacking\|Setting up\|Processing" | tail -5 || true
+    ok=1
+    for lib in libasound.so.2 libnss3.so; do
+      ldconfig -p 2>/dev/null | grep -q "$lib " || { echo "✗ $lib 还是缺"; ok=0; }
+    done
+    [ "$ok" = 1 ] && echo "✓ QQ 运行库已补齐"
+  fi'
   : > "$LOG"
   ARK_BG_LOG="$LOG" "$STATE/proot-run.sh" --bg "$PID" /bin/bash -c '
 cd /root

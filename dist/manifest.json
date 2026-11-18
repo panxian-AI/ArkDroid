@@ -78,11 +78,11 @@
     {
       "id": "astrbot",
       "title": "AstrBot 源码",
-      "desc": "AstrBot 主程序源码（GitHub 分支快照，大小随上游更新变化，不做精确校验）",
+      "desc": "AstrBot 4.30.0-alpha.1 源码 + WebUI 构建产物（离线内置，不再首启联网下载）",
       "file": "astrbot.tar.gz",
       "kind": "tar",
-      "size": 0,
-      "sha256": "",
+      "size": 16433850,
+      "sha256": "26a0a94127b7222244ea88a46a68229196ed4977e6315914b26a95623102996b",
       "mirrors": [
         "https://gh-proxy.com/https://github.com/panxian-AI/ArkLink/releases/download/dist-v1/astrbot.tar.gz",
         "https://ghfast.top/https://github.com/panxian-AI/ArkLink/releases/download/dist-v1/astrbot.tar.gz",
