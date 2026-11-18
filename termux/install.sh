@@ -49,9 +49,29 @@ ok()   { printf '\033[1;32m  ✓ %s\033[0m\n' "$*"; }
 warn() { printf '\033[1;33m  ! %s\033[0m\n' "$*"; }
 die()  { printf '\033[1;31m  ✗ %s\033[0m\n' "$*" >&2; report_prog "done 安装中断：$*"; exit 1; }
 
+# 多镜像测速（和 App 下载卡同款逻辑）：每个镜像下 256 KB 小样，挑最快的。
+# 结果放全局 BEST_MIRROR；$1=镜像列表（空格分隔） $2=每个镜像上的测试文件路径
+BEST_MIRROR=""
+pick_mirror() {
+  BEST_MIRROR=""
+  local best_spd=0 m spd
+  for m in $1; do
+    spd=$(curl -fsSL -m 20 -r 0-262143 -o /dev/null -w '%{speed_download}' "$m$2" 2>/dev/null || echo 0)
+    spd=${spd%.*}; [ -z "$spd" ] && spd=0
+    printf '    %s → %d KB/s\n' "${m#https://}" $((spd / 1024))
+    if [ "$spd" -gt "$best_spd" ]; then best_spd=$spd; BEST_MIRROR=$m; fi
+  done
+}
+
 [ -d /data/data/com.termux ] || die "这个脚本要在 Termux 里跑"
 
 mkdir -p "$STATE"
+# 互斥锁：App 的安装按钮被连点多次时，两个 install.sh 会互相踩（日志会重复、错乱）
+LOCK="$STATE/.running"
+if ! mkdir "$LOCK" 2>/dev/null; then
+  die "已经有一个安装任务在跑了，等它结束；上次是被强杀的话手动清锁：rm -rf $LOCK"
+fi
+trap 'rm -rf "$LOCK"' EXIT
 # 日志由调用方（App 那条命令）用 tee 记，这里只管往 stdout 打
 
 if [ "$SKIP_ASTR" = "1" ]; then
@@ -76,9 +96,19 @@ else
 fi
 [ -n "$LOCAL" ] && ok "走 App 递过来的本地包：$LOCAL" || warn "没有本地包可用，下面会自己找镜像下"
 
-step "1/9 Termux 依赖"
-pkg update -y >/dev/null 2>&1 || warn "pkg update 有报错，继续试"
-pkg install -y proot tar xz-utils curl ca-certificates >/dev/null || die "装 proot 失败，检查网络后重试"
+step "1/9 Termux 依赖（apt 源多镜像测速）"
+export DEBIAN_FRONTEND=noninteractive
+SOURCES="$PREFIX/etc/apt/sources.list"
+pick_mirror "https://mirrors.tuna.tsinghua.edu.cn/termux/apt/termux-main https://mirrors.aliyun.com/termux/apt/termux-main https://mirrors.ustc.edu.cn/termux/apt/termux-main https://mirrors.pku.edu.cn/termux/apt/termux-main https://packages.termux.dev/apt/termux-main" "/dists/stable/Release"
+if [ -n "$BEST_MIRROR" ]; then
+  echo "deb $BEST_MIRROR stable main" > "$SOURCES"
+  ok "apt 源 → ${BEST_MIRROR#https://}（测速胜出）"
+else
+  warn "镜像没测出速度，保留原源接着试"
+fi
+echo "  （apt 正在更新索引、装 proot/curl；下面出现 Get: … / Setting up … 都是正常进度）"
+pkg update -y || warn "pkg update 有报错，继续试"
+pkg install -y proot tar xz-utils curl ca-certificates || die "装 proot 失败，检查网络后重试"
 ok "proot / tar / curl 就绪"
 
 # ------------------------------------------------------------------ 取包
@@ -179,12 +209,16 @@ printf 'nameserver 223.5.5.5\nnameserver 119.29.29.29\nnameserver 8.8.8.8\n' > "
 [ -f "$ROOTFS/etc/hosts" ] || printf '127.0.0.1 localhost\n' > "$ROOTFS/etc/hosts"
 
 if [ "$USE_MIRROR" = "1" ]; then
-  # Ubuntu 24.04 用 deb822 的 sources.list.d/ubuntu.sources
+  # Ubuntu 的 apt 源同样多镜像测速（proot 里还没有 curl，所以在 Termux 侧测）
+  echo "  （正在给 Ubuntu apt 源测速…）"
+  pick_mirror "https://mirrors.aliyun.com https://mirrors.tuna.tsinghua.edu.cn https://mirrors.ustc.edu.cn https://mirrors.pku.edu.cn" "/ubuntu/dists/noble/Release"
+  UB_MIRROR="${BEST_MIRROR:-https://mirrors.aliyun.com}"
+  UB_HOST="${UB_MIRROR#https://}"
   for f in "$ROOTFS/etc/apt/sources.list.d/ubuntu.sources" "$ROOTFS/etc/apt/sources.list"; do
     [ -f "$f" ] || continue
-    sed -i 's@//.*archive.ubuntu.com@//mirrors.aliyun.com@g; s@//security.ubuntu.com@//mirrors.aliyun.com@g; s@//ports.ubuntu.com@//mirrors.aliyun.com@g' "$f"
+    sed -i "s@//.*archive.ubuntu.com@//$UB_HOST@g; s@//security.ubuntu.com@//$UB_HOST@g; s@//ports.ubuntu.com@//$UB_HOST@g" "$f"
   done
-  ok "apt 源换成阿里云"
+  ok "apt 源 → $UB_HOST（测速胜出）"
 fi
 
 # ------------------------------------------------------------------ proot 入口
@@ -215,8 +249,8 @@ if [ "$SKIP_ASTR" = "0" ]; then
   "$STATE/proot-run.sh" /bin/bash -c '
 set -e
 export DEBIAN_FRONTEND=noninteractive
-apt-get update -qq
-apt-get install -y -qq --no-install-recommends python3 python3-pip ca-certificates tzdata curl >/dev/null
+apt-get update
+apt-get install -y --no-install-recommends python3 python3-pip ca-certificates tzdata curl
 python3 -V
   ' || die "Ubuntu 里装 python3 失败（看上面的 apt 输出）"
   ok "python3 就绪"
@@ -284,14 +318,14 @@ else
   "$STATE/proot-run.sh" /bin/bash -c '
 set -e
 export DEBIAN_FRONTEND=noninteractive
-apt-get update -qq
-apt-get install -y -qq --no-install-recommends unzip xvfb dbus dbus-x11 fonts-noto-cjk procps >/dev/null
+apt-get update
+apt-get install -y --no-install-recommends unzip xvfb dbus dbus-x11 fonts-noto-cjk procps
 echo "  Xvfb / dbus / 中文字体就绪"
 if [ -x /opt/QQ/qq ]; then
   echo "  QQ 已装，跳过 deb"
 elif [ -f /root/.arkdroid/linuxqq_arm64.deb ]; then
   echo "  开始装 QQ（apt 解依赖，几分钟）…"
-  apt-get install -y -qq /root/.arkdroid/linuxqq_arm64.deb
+  apt-get install -y /root/.arkdroid/linuxqq_arm64.deb
 else
   echo "NO_QQ_DEB"
   exit 3
