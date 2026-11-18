@@ -13,9 +13,8 @@ start() {
   fi
   if running; then echo "已经在跑了（pid $(cat "$PID")）"; return 0; fi
   : > "$LOG"
-  nohup "$STATE/proot-run.sh" /bin/bash -c 'cd /root/ArkLink && exec python3 -m arklink serve onebot --type milky --set base_url=http://127.0.0.1:3000 --port 6700 --token ""' >> "$LOG" 2>&1 &
-  echo $! > "$PID"
-  echo "已启动（pid $(cat "$PID")）。ArkBridge 连 ws://127.0.0.1:6700/onebot/v11/ws"
+  ARK_BG_LOG="$LOG" "$STATE/proot-run.sh" --bg "$PID" /bin/bash -c 'cd /root/ArkLink && exec python3 -m arklink serve onebot --type milky --set base_url=http://127.0.0.1:3000 --port 6700 --token ""'
+  echo "已启动（pid $(cat "$PID" 2>/dev/null)）。ArkBridge 连 ws://127.0.0.1:6700/onebot/v11/ws"
   sleep 3
   tail -n 12 "$LOG" 2>/dev/null || true
 }

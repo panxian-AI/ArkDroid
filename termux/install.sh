@@ -170,15 +170,21 @@ for c in astr qq arklink; do
   [ -f "$STATE/$c" ] && ln -sf "$STATE/$c" "$PREFIX/bin/$c" 2>/dev/null && ok "$c 命令已就绪"
 done
 
-step "1/9 Termux 依赖（apt 源多镜像测速）"
-export DEBIAN_FRONTEND=noninteractive
-SOURCES="$PREFIX/etc/apt/sources.list"
+step "1/9 检查 Termux 运行时自带工具"
+# 嵌入式运行时用的是官方 bootstrap，tar/gzip/xz/curl/coreutils/unzip 都已自带，
+# 不需要 apt 装任何东西（而且 proot -0 下 pkg 会拒绝以 root 运行）。
+MISSING=""
+for t in bash tar gzip curl dpkg-deb unzip sed find pgrep; do
+  command -v "$t" >/dev/null 2>&1 || MISSING="$MISSING $t"
+done
+[ -z "$MISSING" ] || die "运行时缺命令：$MISSING（bootstrap 可能没解压完整，回 App 重新装一次）"
+ok "自带工具齐全（bootstrap 已含 tar/curl/xz/unzip，无需联网装包）"
 
-# 多镜像测速：每个镜像下 256 KB 小样挑最快的。curl 还没装时直接用清华源（不测速）。
+# 多镜像测速：每个镜像下 256 KB 小样挑最快的（给 Ubuntu 的 apt 源用）
 BEST_MIRROR=""
 pick_mirror() { # $1=镜像列表 $2=测试文件路径
   BEST_MIRROR=""
-  command -v curl >/dev/null 2>&1 || { warn "curl 还没装上，跳过测速"; return 0; }
+  command -v curl >/dev/null 2>&1 || { warn "没有 curl，跳过测速"; return 0; }
   local best_spd=0 m spd
   for m in $1; do
     spd=$(curl -fsSL -m 20 -r 0-262143 -o /dev/null -w '%{speed_download}' "$m$2" 2>/dev/null || echo 0)
@@ -187,23 +193,6 @@ pick_mirror() { # $1=镜像列表 $2=测试文件路径
     if [ "$spd" -gt "$best_spd" ]; then best_spd=$spd; BEST_MIRROR=$m; fi
   done
 }
-
-pick_mirror "https://mirrors.tuna.tsinghua.edu.cn/termux/apt/termux-main https://mirrors.aliyun.com/termux/apt/termux-main https://mirrors.ustc.edu.cn/termux/apt/termux-main https://mirrors.pku.edu.cn/termux/apt/termux-main https://packages.termux.dev/apt/termux-main" "/dists/stable/Release"
-if [ -n "$BEST_MIRROR" ]; then
-  echo "deb $BEST_MIRROR stable main" > "$SOURCES"
-  ok "apt 源 → ${BEST_MIRROR#https://}（测速胜出）"
-else
-  grep -q "mirrors.tuna.tsinghua.edu.cn/termux" "$SOURCES" 2>/dev/null \
-    || echo "deb https://mirrors.tuna.tsinghua.edu.cn/termux/apt/termux-main stable main" > "$SOURCES"
-  ok "apt 源 → 清华（默认）"
-fi
-echo "  （apt 正在更新索引、装 proot/curl；出现 Get: … / Setting up … 都是正常进度）"
-# 注意：本环境里 proot -0 把 uid 伪装成 root，Termux 的 pkg 壳会拒绝
-# "Cannot run 'pkg' command as root"，所以直接用 apt-get（pkg 只是它的封装）
-apt-get update -y || warn "apt update 有报错，继续试"
-apt-get install -y -o APT::Sandbox::User=root proot tar xz-utils curl ca-certificates \
-  || die "装 proot 失败，检查网络后重试"
-ok "proot / tar / curl 就绪"
 
 # ------------------------------------------------------------------ 取包
 fetch_pkg() { # $1=文件名 $2=落地路径  $3=失败是否致命（die|warn），默认 die
@@ -315,27 +304,59 @@ if [ "$USE_MIRROR" = "1" ]; then
   ok "apt 源 → $UB_HOST（测速胜出）"
 fi
 
-# ------------------------------------------------------------------ proot 入口
+# ------------------------------------------------------------------ Ubuntu 入口
+# 为什么是「转发」而不是直接 proot：本脚本跑在 Termux 运行时里，而那个环境本身就是
+# proot（外层已经用 ptrace 接管所有子孙进程），再起一个 proot 必然失败。所以把命令
+# 交给 App，由 App 起一个平级的 proot 进程去 Ubuntu rootfs 里跑。
 cat > "$STATE/proot-run.sh" <<'EOS'
 #!/data/data/com.termux/files/usr/bin/bash
-# 在 rootfs 里执行命令：proot-run.sh <命令...>
+# proot-run.sh /bin/bash -c '命令'                → 同步执行，返回退出码
+# proot-run.sh --bg <pid文件> /bin/bash -c '命令'  → 后台常驻，pid 写进文件
 STATE="$HOME/.arkdroid"
-ROOTFS="$STATE/rootfs"
-exec proot --link2symlink -0 \
-  -r "$ROOTFS" \
-  -b /dev -b /proc -b /sys \
-  -b "$STATE:/root/.arkdroid" \
-  -w /root \
-  /usr/bin/env -i \
-    HOME=/root \
-    PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
-    LANG=C.UTF-8 LANGUAGE=C.UTF-8 LC_ALL=C.UTF-8 \
-    TERM="${TERM:-xterm-256color}" \
-    ${ARK_ENV:-} \
-  "$@"
+LOCAL="${ARKDROID_LOCAL:-}"
+[ -n "$LOCAL" ] || { echo "proot-run: ARKDROID_LOCAL 为空（App 的本地服务没起来）" >&2; exit 9; }
+
+PIFILE=""
+if [ "${1:-}" = "--bg" ]; then PIFILE="${2:-}"; shift 2 || true; fi
+
+if [ "${1:-}" = "/bin/bash" ] || [ "${1:-}" = "bash" ]; then
+  shift
+  case "${1:-}" in
+    -c) shift; CMD="$*" ;;
+    -l|"") echo "proot-run: 不支持交互 shell（App 不是终端），用 astr run '命令'" >&2; exit 2 ;;
+    *) CMD="bash $*" ;;
+  esac
+else
+  CMD="$*"
+fi
+# astr resetpw 之类会通过 ARK_ENV 传环境变量（形如 A=1 B=2）
+[ -n "${ARK_ENV:-}" ] && CMD="export $ARK_ENV; $CMD"
+
+if [ -n "$PIFILE" ]; then
+  LOGF="${ARK_BG_LOG:-$STATE/ubuntu-bg.log}"
+  out=$(printf '%s' "$CMD" | curl -sS --max-time 120 -X POST --data-binary @- \
+        "$LOCAL/p/ubuntu-bg?log=$LOGF" 2>/dev/null) || {
+    echo "proot-run: 后台启动失败（App 回环不通）" >&2; exit 9; }
+  pid="${out#pid=}"
+  case "$pid" in
+    ''|-1|*[!0-9]*) echo "proot-run: 后台启动失败：$out" >&2; exit 9 ;;
+  esac
+  echo "$pid" > "$PIFILE"
+  echo "已在后台启动（pid $pid），日志：$LOGF"
+  exit 0
+fi
+
+out=$(printf '%s' "$CMD" | curl -sS --max-time 0 -X POST --data-binary @- \
+      "$LOCAL/p/ubuntu" 2>/dev/null) || {
+  echo "proot-run: App 没回话（本地服务不通，App 可能被杀了）" >&2; exit 9; }
+case "$out" in
+  exit=0) exit 0 ;;
+  exit=*) exit "${out#exit=}" ;;
+  *) echo "proot-run: 意外的回复：$out" >&2; exit 9 ;;
+esac
 EOS
 chmod +x "$STATE/proot-run.sh"
-ok "proot 入口写好：$STATE/proot-run.sh"
+ok "Ubuntu 入口写好：$STATE/proot-run.sh（命令交给 App 起平级 proot 执行）"
 
 # ------------------------------------------------------------------ 3-6/9 AstrBot
 if [ "$SKIP_ASTR" = "0" ]; then

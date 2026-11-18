@@ -60,6 +60,16 @@ final class TermuxRuntime {
         return new File(usr(ctx), "bin/bash").isFile();
     }
 
+    /** Ubuntu 根文件系统（装 AstrBot / QQ 的 glibc 环境）。 */
+    static File rootfs(Context ctx) {
+        return new File(home(ctx), ".arkdroid/rootfs");
+    }
+
+    /** 安装器状态目录（rootfs 外的那些脚本、安装包、日志）。 */
+    static File state(Context ctx) {
+        return new File(home(ctx), ".arkdroid");
+    }
+
     /** 装到一半（bootstrap 在下载或解压中）？用于 UI 区分提示。 */
     static boolean partial(Context ctx) {
         return usr(ctx).isDirectory() && !ready(ctx);
@@ -283,5 +293,123 @@ final class TermuxRuntime {
                     + "（targetSdk 必须是 28，否则 Android 禁止执行私有目录里的二进制）");
             return false;
         }
+    }
+
+    // ------------------------------------------------------------------ Ubuntu 侧
+    //
+    // 为什么 Ubuntu 的命令必须由 App 起进程：上面那条 exec() 本身已经在 proot 里了，
+    // 再在 guest 里调 proot 就是「proot 套 proot」——外层 proot 已经通过 ptrace 接管了
+    // 所有子孙进程，内层 proot 的 PTRACE_TRACEME 必然失败。所以 Ubuntu 环境统一由 App
+    // 起一个和 Termux 环境平级的 proot 进程（sbiling，不是 child of proot）。
+
+    private static ProcessBuilder ubuntuProcess(Context ctx, String command) {
+        File prootTmp = new File(ctx.getCacheDir(), "proot");
+        if (!prootTmp.isDirectory() && !prootTmp.mkdirs()) {
+            LogBus.append("建不了 proot 临时目录：" + prootTmp);
+        }
+        ProcessBuilder pb = new ProcessBuilder(
+                new File(nativeBin(ctx), "proot").getAbsolutePath(),
+                "--link2symlink",
+                "-0",
+                "-r", rootfs(ctx).getAbsolutePath(),
+                "-b", "/dev",
+                "-b", "/proc",
+                "-b", "/sys",
+                // 安装包、控制脚本都在 rootfs 外的 ~/.arkdroid 里，挂进 Ubuntu 给脚本用
+                "-b", state(ctx).getAbsolutePath() + ":/root/.arkdroid",
+                "-w", "/root",
+                "/usr/bin/env", "-i",
+                "HOME=/root",
+                "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                "LANG=C.UTF-8",
+                "LC_ALL=C.UTF-8",
+                "TERM=xterm-256color",
+                "/bin/bash", "-c", command);
+        Map<String, String> env = pb.environment();
+        env.put("PROOT_LOADER", new File(nativeBin(ctx), "loader").getAbsolutePath());
+        env.put("PROOT_LOADER32", new File(nativeBin(ctx), "loader32").getAbsolutePath());
+        env.put("PROOT_TMP_DIR", prootTmp.getAbsolutePath());
+        env.put("PROOT_NO_SECCOMP", "1");
+        env.put("LD_LIBRARY_PATH", nativeBin(ctx).getAbsolutePath());
+        pb.directory(state(ctx));
+        pb.redirectErrorStream(true);
+        return pb;
+    }
+
+    /** 同步跑一段 Ubuntu 命令：输出逐行进「终端」+ install.log，返回退出码。 */
+    static int execUbuntu(Context ctx, String command) {
+        if (!new File(rootfs(ctx), "etc/os-release").isFile()) {
+            LogBus.append("Ubuntu 根文件系统还没解压（安装器的 2/9 步），先跑安装");
+            return 127;
+        }
+        try {
+            Process p = ubuntuProcess(ctx, command).start();
+            Term.note("(ubuntu) " + firstLine(command));
+            pump(p.getInputStream(), new File(state(ctx), "install.log"));
+            int code = p.waitFor();
+            Term.note("(ubuntu) 退出码 " + code);
+            return code;
+        } catch (IOException e) {
+            LogBus.append("起不了 Ubuntu 环境：" + e.getMessage());
+            return 126;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return 130;
+        }
+    }
+
+    /** 后台起一个 Ubuntu 长驻进程（AstrBot / QQ / ArkLink），输出写日志文件，返回 pid。 */
+    static int startUbuntuBg(Context ctx, String command, File log) {
+        if (!new File(rootfs(ctx), "etc/os-release").isFile()) {
+            LogBus.append("Ubuntu 根文件系统还没解压，起不了 " + command);
+            return -1;
+        }
+        try {
+            Process p = ubuntuProcess(ctx, command).start();
+            long pid = pidOf(p);
+            Thread t = new Thread(() -> pump(p.getInputStream(), log), "arkdroid-ubuntu-bg");
+            t.setDaemon(true);
+            t.start();
+            Term.note("后台启动（pid " + pid + "）：" + firstLine(command));
+            return (int) pid;
+        } catch (IOException e) {
+            LogBus.append("起不了 Ubuntu 进程：" + e.getMessage());
+            return -1;
+        }
+    }
+
+    /** 流式转出：同时进「终端」和日志文件（日志给 astr log 之类的命令看）。 */
+    private static void pump(InputStream in, File log) {
+        try (BufferedReader r = new BufferedReader(
+                new InputStreamReader(in, StandardCharsets.UTF_8));
+             java.io.FileWriter w = new java.io.FileWriter(log, true)) {
+            String line;
+            while ((line = r.readLine()) != null) {
+                Term.append(line);
+                w.write(line);
+                w.write('\n');
+                w.flush();
+            }
+        } catch (IOException ignored) {
+            // 对端关了或者日志写不进去，都不该影响进程本身
+        }
+    }
+
+    private static long pidOf(Process p) {
+        try {
+            java.lang.reflect.Field f = p.getClass().getDeclaredField("pid");
+            f.setAccessible(true);
+            return ((Number) f.get(p)).longValue();
+        } catch (Exception e) {
+            return -1;
+        }
+    }
+
+    private static String firstLine(String s) {
+        if (s == null) {
+            return "";
+        }
+        int i = s.indexOf('\n');
+        return i < 0 ? s : s.substring(0, i) + " …";
     }
 }

@@ -13,7 +13,7 @@ start() {
   fi
   if running; then echo "已经在跑了（pid $(cat "$PID")）"; return 0; fi
   : > "$LOG"
-  nohup "$STATE/proot-run.sh" /bin/bash -c '
+  ARK_BG_LOG="$LOG" "$STATE/proot-run.sh" --bg "$PID" /bin/bash -c '
 cd /root
 pgrep -x Xvfb >/dev/null || { Xvfb :1 -screen 0 1280x720x16 -nolisten tcp >/root/.arkdroid/xvfb.log 2>&1 & }
 sleep 2
@@ -23,9 +23,8 @@ exec /opt/QQ/qq --no-sandbox \
   --disable-software-rasterizer \
   --disable-gpu-compositing \
   --disable-dev-shm-usage
-  ' >> "$LOG" 2>&1 &
-  echo $! > "$PID"
-  echo "已启动（pid $(cat "$PID")）。首次登录：浏览器开 http://127.0.0.1:6099/webui 扫码"
+  '
+  echo "已启动（pid $(cat "$PID" 2>/dev/null)）。首次登录：浏览器开 http://127.0.0.1:6099/webui 扫码"
   sleep 4
   tail -n 12 "$LOG" 2>/dev/null || true
 }

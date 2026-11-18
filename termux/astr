@@ -40,10 +40,10 @@ start() {
   fi
   if running; then echo "已经在跑了（pid $(cat "$PID")）"; return 0; fi
   : > "$LOG"
-  nohup "$STATE/proot-run.sh" /bin/bash -c \
-    'cd /root/AstrBot && exec ./.venv/bin/python main.py' >> "$LOG" 2>&1 &
-  echo $! > "$PID"
-  echo "已启动（pid $(cat "$PID")），日志：$LOG"
+  # 由 App 起平级 proot 进程（外层 Termux 环境已经是 proot，不能再套一层）
+  ARK_BG_LOG="$LOG" "$STATE/proot-run.sh" --bg "$PID" /bin/bash -c \
+    'cd /root/AstrBot && exec ./.venv/bin/python main.py'
+  echo "已启动（pid $(cat "$PID" 2>/dev/null)），日志：$LOG"
   sleep 3
   tail -n 12 "$LOG" 2>/dev/null || true
 }
@@ -86,7 +86,7 @@ case "${1:-status}" in
     sleep 6
     echo "完成。账号 astrbot / 密码 $pw"
     ;;
-  shell) "$STATE/proot-run.sh" /bin/bash -l ;;
+  shell) echo "交互 shell 不可用（App 不是终端）。用：astr run '命令'，例如 astr run 'ls /root'" ;;
   run) shift; "$STATE/proot-run.sh" /bin/bash -c "$*" ;;
   *) echo "用法: astr {start|stop|restart|status|log|creds|resetpw|shell|run}" ;;
 esac

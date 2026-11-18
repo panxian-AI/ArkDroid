@@ -152,6 +152,26 @@ final class LocalServer {
                 respond(socket, 403, "text/plain", "forbidden".getBytes(StandardCharsets.UTF_8), null, 0);
                 return;
             }
+            if ("POST".equals(head.method) && rest.startsWith("p/ubuntu")) {
+                // 安装器/控制脚本把「要在 Ubuntu 里跑的命令」POST 过来，由 App 起平级
+                // proot 进程执行（外层 Termux 环境本身已是 proot，不能再套一层）
+                byte[] body = HttpWire.readBody(in, head);
+                String command = new String(body, StandardCharsets.UTF_8);
+                String reply;
+                if (rest.startsWith("p/ubuntu-bg")) {
+                    File log = guestPath(queryParam(head.path, "log"));
+                    if (log == null) {
+                        log = new File(Catalog.dir(app), "ubuntu-bg.log");
+                    }
+                    int pid = TermuxRuntime.startUbuntuBg(app, command, log);
+                    reply = "pid=" + pid;
+                } else {
+                    reply = "exit=" + TermuxRuntime.execUbuntu(app, command);
+                }
+                byte[] payload = reply.getBytes(StandardCharsets.UTF_8);
+                respond(socket, 200, "text/plain", payload, null, payload.length);
+                return;
+            }
             if ("POST".equals(head.method) && rest.startsWith("p/")) {
                 byte[] body = HttpWire.readBody(in, head);
                 Push.handle(rest.substring(2), new String(body, StandardCharsets.UTF_8));
@@ -232,6 +252,37 @@ final class LocalServer {
     }
 
     // ------------------------------------------------------------------ HTTP 基础件
+
+    /** 从 path 里取 ?k=v 的值（只处理我们自己的简单场景）。 */
+    private static String queryParam(String path, String key) {
+        int q = path.indexOf('?');
+        if (q < 0) {
+            return null;
+        }
+        for (String pair : path.substring(q + 1).split("&")) {
+            int eq = pair.indexOf('=');
+            if (eq > 0 && pair.substring(0, eq).equals(key)) {
+                return pair.substring(eq + 1);
+            }
+        }
+        return null;
+    }
+
+    /**
+     * guest 里的绝对路径 → App 私有目录里的真实路径。
+     * Termux 环境（proot）里看到的是 /data/data/com.termux/files/...，
+     * 实际落在 files/termux/...，两边后半段结构一致。
+     */
+    private File guestPath(String p) {
+        if (p == null || p.isEmpty()) {
+            return null;
+        }
+        String prefix = "/data/data/com.termux/files";
+        if (p.startsWith(prefix)) {
+            return new File(new File(app.getFilesDir(), "termux"), p.substring(prefix.length()));
+        }
+        return new File(p);
+    }
 
     private static void respond(Socket socket, int code, String type, byte[] body,
                                 String extraHeaders, int length) throws IOException {
