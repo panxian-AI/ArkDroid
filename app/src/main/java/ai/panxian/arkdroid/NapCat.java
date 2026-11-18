@@ -39,6 +39,7 @@ final class NapCat {
     /** 最近一次探测结果。 */
     static volatile boolean webuiUp;
     static volatile boolean arklinkUp;
+    static volatile boolean onebotUp;
     static volatile String lastError = "";
     static volatile long probedAt;
 
@@ -77,9 +78,10 @@ final class NapCat {
                 300);
     }
 
-    /** 探测 NapCat WebUI(6099) 与 ArkLink(6700) 是否在线。要在后台线程调。 */
+    /** 探测 NapCat WebUI(6099)、OneBot WS(3001) 与 ArkLink(6700) 是否在线。要在后台线程调。 */
     static void probe() {
         webuiUp = alive(WEBUI_PORT);
+        onebotUp = alive(ONEBOT_PORT);
         arklinkUp = alive(ARKLINK_PORT);
         probedAt = System.currentTimeMillis();
     }
@@ -105,11 +107,14 @@ final class NapCat {
     }
 
     static String summary() {
-        if (arklinkUp && webuiUp) {
-            return "链路在线 · ArkLink " + ARKLINK_PORT + " · NapCat WebUI " + WEBUI_PORT;
+        if (webuiUp && onebotUp) {
+            return "链路在线 · NapCat WebUI " + WEBUI_PORT + " · OneBot 直连 " + ONEBOT_PORT + "（中继连这个）";
+        }
+        if (onebotUp) {
+            return "OneBot " + ONEBOT_PORT + " 在线，WebUI " + WEBUI_PORT + " 没响应（qq log 看）";
         }
         if (webuiUp) {
-            return "NapCat 在线（WebUI " + WEBUI_PORT + "），ArkLink 没起来（arklink start）";
+            return "NapCat 在线（WebUI " + WEBUI_PORT + "），OneBot " + ONEBOT_PORT + " 未确认";
         }
         return "没响应（还没装，或者没启动）";
     }

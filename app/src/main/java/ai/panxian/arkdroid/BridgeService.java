@@ -191,7 +191,8 @@ public class BridgeService extends Service {
                 }
             }
             astrOnline = portOpen(6185);
-            arkOnline = portOpen(6700);
+            // 中继上游：ArkLink 6700 或 NapCat OneBot 直连 3001，谁在线都算
+            arkOnline = portOpen(6700) || portOpen(3001);
             refreshNotification();
         });
     }

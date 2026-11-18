@@ -48,6 +48,7 @@ public class MainActivity extends AppCompatActivity {
     private TextView txtLog;
     private NestedScrollView logScroll;
     private SwitchMaterial swAutostart;
+    private boolean autoStarted;
     private TextInputEditText inpArklink;
     private TextInputEditText inpAstrbot;
     private TextInputEditText inpSelfId;
@@ -213,6 +214,38 @@ public class MainActivity extends AppCompatActivity {
         if (prefs.autostart() && !BridgeService.running) {
             BridgeService.start(this);
         }
+        autoStartAll();
+    }
+
+    /**
+     * 傻瓜式：装完之后打开 App 就自动把 AstrBot 和 NapCat 拉起来，中继地址也自动
+     * 迁移到 NapCat 直连 3001——用户不用手敲 qq start / arklink start，也不用去
+     * WebUI 配 Milky。全部命令幂等，重复跑无害。
+     */
+    private void autoStartAll() {
+        if (autoStarted || !prefs.autostart() || !Termux.installed(this) || Termux.installing(this)) {
+            return;
+        }
+        autoStarted = true;
+        ui.postDelayed(() -> bg.execute(() -> {
+            NapCat.seedOneBotConfig(this);
+            // 旧版默认中继指向 ArkLink 6700（要手动配 Milky）；迁移到 NapCat OneBot 直连 3001
+            if (prefs.arklink().equals(Prefs.DEF_ARKLINK)) {
+                prefs.save(NapCat.ONEBOT_URL, prefs.astrbot(), prefs.selfId(),
+                        prefs.arklinkToken(), prefs.astrbotToken());
+                ui.post(() -> inpArklink.setText(NapCat.ONEBOT_URL));
+                BridgeService.restart(this);
+                LogBus.append("中继地址已自动迁移到 NapCat 直连 " + NapCat.ONEBOT_URL + "（不用再配 Milky）");
+            }
+            if (!BridgeService.running) {
+                BridgeService.start(this);
+            }
+            Termux.send(this,
+                    "if [ -f \"$HOME/.arkdroid/rootfs/root/AstrBot/main.py\" ]; then astr start; fi;"
+                            + " if [ -f \"$HOME/.arkdroid/rootfs/opt/QQ/qq\" ]; then qq start; fi",
+                    180);
+            LogBus.append("已自动拉起 AstrBot / NapCat（装好的才会起；幂等，重复无害）");
+        }), 4000);
     }
 
     @Override
@@ -383,11 +416,11 @@ public class MainActivity extends AppCompatActivity {
         });
         findViewById(R.id.btnQqWeb).setOnClickListener(v -> openWeb(NapCat.WEBUI_URL, "NapCat WebUI"));
         findViewById(R.id.btnQqFill).setOnClickListener(v -> {
-            inpArklink.setText(NapCat.ARKLINK_URL);
-            prefs.save(NapCat.ARKLINK_URL, value(inpAstrbot), value(inpSelfId),
+            inpArklink.setText(NapCat.ONEBOT_URL);
+            prefs.save(NapCat.ONEBOT_URL, value(inpAstrbot), value(inpSelfId),
                     value(inpArklinkToken), value(inpAstrbotToken));
             BridgeService.restart(this);
-            toast("中继已改成连本机 ArkLink：" + NapCat.ARKLINK_URL);
+            toast("中继已改成直连本机 NapCat：" + NapCat.ONEBOT_URL + "（不用再配 Milky）");
         });
 
         findViewById(R.id.navQq).setOnClickListener(v -> jumpTo(cardQq));
@@ -754,17 +787,19 @@ public class MainActivity extends AppCompatActivity {
             NapCat.probedAt = now;              // 先占位，避免每 600ms 都压一个探测
             bg.execute(NapCat::probe);
         }
-        if (NapCat.arklinkUp && NapCat.webuiUp) {
-            tv.setText("链路在线：ArkLink 6700（中继连它）+ NapCat WebUI 6099");
+        if (NapCat.onebotUp && NapCat.webuiUp) {
+            tv.setText("链路在线：NapCat WebUI 6099 + OneBot 直连 3001（中继连它，不用再配 Milky）");
             tv.setTextColor(getColor(R.color.ok));
+        } else if (NapCat.onebotUp) {
+            tv.setText("OneBot 3001 在线（中继直连它），WebUI 6099 没响应——qq log 看日志");
+            tv.setTextColor(getColor(R.color.warn));
         } else if (NapCat.webuiUp) {
-            tv.setText("NapCat 在线（WebUI 6099），ArkLink 没起来——点「启动」或终端跑 arklink start。\n"
-                    + "记得在 WebUI「网络配置」新建 Milky 服务器：127.0.0.1:3000");
+            tv.setText("NapCat 在线（WebUI 6099），OneBot 3001 未确认——「启动」会自动把中继地址填成直连");
             tv.setTextColor(getColor(R.color.warn));
         } else {
-            tv.setText("没响应。第一次：先点「装 NapCat」（会一并装 QQ + ArkLink），\n"
-                    + "装完点「启动」→「扫码登录」在 WebUI 里登录 QQ 并新建 Milky 服务器 127.0.0.1:3000，\n"
-                    + "最后点「填本机地址」，中继走 ws://127.0.0.1:6700/onebot/v11/ws");
+            tv.setText("没响应。第一次：点「装 NapCat」（一并装 QQ）→ 点「启动」（自动补运行库 + 起服务）\n"
+                    + "→ 在 WebUI 6099 里扫码登录 QQ（登录后 OneBot 3001 自动就绪）\n"
+                    + "→ 点「填本机地址」，中继直连 ws://127.0.0.1:3001（不用配 Milky）");
             tv.setTextColor(getColor(R.color.muted));
         }
     }

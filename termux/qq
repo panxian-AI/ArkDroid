@@ -4,14 +4,39 @@ STATE="$HOME/.arkdroid"
 LOG="$STATE/qq.log"
 PID="$STATE/qq.pid"
 
-running() { [ -f "$PID" ] && kill -0 "$(cat "$PID")" 2>/dev/null; }
+# pidfile 不可信时兜底按进程特征找（和 astr 同一套思路）
+pid_of() {
+  if [ -f "$PID" ]; then
+    p=$(tr -dc '0-9' < "$PID" 2>/dev/null)
+    if [ -n "$p" ] && kill -0 "$p" 2>/dev/null; then echo "$p"; return 0; fi
+  fi
+  p=$(pgrep -f '/opt/QQ/qq' 2>/dev/null | head -n 1)
+  if [ -n "$p" ]; then echo "$p" > "$PID" 2>/dev/null; echo "$p"; return 0; fi
+  rm -f "$PID"
+  return 1
+}
+running() { pid_of >/dev/null 2>&1; }
+
+# NapCat WebUI(6099) 有 HTTP 响应才算真的在线（401/200/302 都算）
+webui_ok() {
+  code=$(curl -s -o /dev/null -m 2 -w '%{http_code}' http://127.0.0.1:6099/ 2>/dev/null || echo 000)
+  [ "$code" != "000" ] && [ "$code" != "" ]
+}
 
 start() {
   if [ ! -f "$STATE/rootfs/opt/QQ/qq" ]; then
     echo "QQ 还没装（rootfs/opt/QQ/qq 不存在）。先在 App 的 QQ 卡里点「装本机 QQ」。"
     exit 1
   fi
-  if running; then echo "已经在跑了（pid $(cat "$PID")）"; return 0; fi
+  if running; then
+    if webui_ok; then
+      echo "已经在跑了（pid $(pid_of)），NapCat 在线"
+    else
+      echo "进程在（pid $(pid_of)）但 NapCat 没响应（6099 不通）。最近日志："
+      tail -n 10 "$LOG" 2>/dev/null
+    fi
+    return 0
+  fi
   # 依赖自愈：老安装可能缺 Electron 运行库（比如 libasound.so.2），缺就当场补，输出不吞
   "$STATE/proot-run.sh" /bin/bash -c '
   missing=0
@@ -47,14 +72,30 @@ exec /opt/QQ/qq --no-sandbox \
   --disable-dev-shm-usage
   '
   echo "已启动（pid $(cat "$PID" 2>/dev/null)）。首次登录：浏览器开 http://127.0.0.1:6099/webui 扫码"
-  sleep 4
-  tail -n 12 "$LOG" 2>/dev/null || true
+  # 等最多 20 秒，真验证 NapCat 起没起来，别拿 pid 糊弄人
+  ok=0
+  for i in $(seq 1 20); do
+    sleep 1
+    if webui_ok; then ok=1; break; fi
+    running || break
+  done
+  if [ "$ok" = 1 ]; then
+    echo "✓ NapCat 已在线（WebUI 6099）"
+  elif ! running; then
+    echo "✗ QQ 进程退了（没起来）。日志最后几行："
+    tail -n 15 "$LOG" 2>/dev/null
+  else
+    echo "△ NapCat 20 秒还没响应（首次启动可能慢，稍等 qq status 再看）。日志最后几行："
+    tail -n 10 "$LOG" 2>/dev/null
+  fi
 }
 
 stop() {
-  if running; then kill "$(cat "$PID")" 2>/dev/null || true; rm -f "$PID"; fi
+  p=$(pid_of 2>/dev/null || true)
+  [ -n "$p" ] && kill "$p" 2>/dev/null || true
   pkill -f "/opt/QQ/qq" 2>/dev/null || true
   pkill -f "Xvfb :1" 2>/dev/null || true
+  rm -f "$PID"
   echo "已停止"
 }
 
@@ -63,9 +104,15 @@ case "${1:-status}" in
   stop) stop ;;
   restart) stop; sleep 2; start ;;
   status)
-    running && echo "进程在跑（pid $(cat "$PID")）" || echo "进程没在跑"
-    code=$(curl -s -o /dev/null -m 4 -w '%{http_code}' http://127.0.0.1:6099/ 2>/dev/null || echo 000)
-    echo "NapCat WebUI 127.0.0.1:6099 → HTTP $code（401/200 都算在线）"
+    running && echo "进程在跑（pid $(pid_of)）" || echo "进程没在跑"
+    if webui_ok; then
+      echo "NapCat WebUI 127.0.0.1:6099 ✓ 在线"
+      curl -s -o /dev/null -m 2 http://127.0.0.1:3001/ 2>/dev/null \
+        && echo "OneBot WS 127.0.0.1:3001 ✓（中继直连这个）" \
+        || echo "OneBot WS 127.0.0.1:3001 △ 未确认（WS 端口不一定响应 HTTP）"
+    else
+      echo "NapCat WebUI 127.0.0.1:6099 ✗ 没响应（没登录/没起来，看 qq log）"
+    fi
     [ -f "$LOG" ] && echo "日志最后一行：$(tail -n 1 "$LOG" 2>/dev/null)"
     ;;
   log) tail -n "${2:-80}" "$LOG" 2>/dev/null || echo "还没日志" ;;
