@@ -281,7 +281,15 @@ else
   fetch_pkg ubuntu-rootfs.tar.gz "$TMP"
   mkdir -p "$ROOTFS"
   warn "解压 rootfs…"
-  tar xzf "$TMP" -C "$ROOTFS" || die "解压失败，包可能是坏的"
+  # 硬链接失败在 Android 上很常见（proot 的 link2symlink 已经把大部分改写成软链），
+  # 这类报错不必展示也不必中断；其余错误照常打出来。
+  tar xzf "$TMP" -C "$ROOTFS" 2> "$STATE/rootfs-extract.err" || true
+  grep -v 'Cannot hard link' "$STATE/rootfs-extract.err" 2>/dev/null | head -20 || true
+  rm -f "$STATE/rootfs-extract.err"
+  # tar 只要有一条报错就整体返回非 0，所以按实际内容判断，别被退出码骗了
+  if [ ! -f "$ROOTFS/etc/os-release" ] || [ ! -x "$ROOTFS/bin/bash" ]; then
+    die "解压失败（rootfs 关键文件缺失），包可能是坏的"
+  fi
   rm -f "$TMP"
   ok "解好了：$ROOTFS"
 fi

@@ -240,6 +240,11 @@ final class TermuxRuntime {
         }
         ProcessBuilder pb = new ProcessBuilder(
                 new File(nativeBin(ctx), "proot").getAbsolutePath(),
+                // Android 的文件系统/SELinux 不允许普通 App 建硬链接，解 Ubuntu rootfs 时
+                // tar 一遇到硬链接就 "Cannot hard link to ... Permission denied" 并整体失败。
+                // --link2symlink 让 proot 把 link() 改写成符号链接，tar 就能正常走完。
+                // Termux 官方的 proot-distro 也是这么干的。
+                "--link2symlink",
                 "-0",
                 "-w", GUEST_HOME,
                 "-b", usr(ctx).getAbsolutePath() + ":" + GUEST_PREFIX,
@@ -257,6 +262,9 @@ final class TermuxRuntime {
         env.put("PROOT_LOADER", new File(nativeBin(ctx), "loader").getAbsolutePath());
         env.put("PROOT_LOADER32", new File(nativeBin(ctx), "loader32").getAbsolutePath());
         env.put("PROOT_TMP_DIR", new File(ctx.getCacheDir(), "proot").getAbsolutePath());
+        // link2symlink 的改写产物放这里（默认放在链接所在目录，也是可写的，只是统一到
+        // 一个地方更好清）
+        env.put("PROOT_L2S_DIR", prootTmp.getAbsolutePath());
         env.put("PROOT_NO_SECCOMP", "1");
         // proot 本体用 nativeBin 里的 libtalloc/libandroid-shmem；guest 里的 Termux
         // 二进制（bash/curl/…）靠 $PREFIX/lib 找自己的依赖库（链接器的 open 会被
