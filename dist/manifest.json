@@ -52,8 +52,8 @@
       "desc": "NapCat.Shell.zip（用户自备，注入 QQ；装完自动配 Milky）",
       "file": "napcat.zip",
       "kind": "file",
-      "size": 0,
-      "sha256": "",
+      "size": 35945744,
+      "sha256": "bbc7804f5e4a73a58c0564891acf40002b56c149019357fa638da4dfe8f1c286",
       "mirrors": [
         "https://github.com/panxian-AI/ArkLink/releases/download/napcat-shell/NapCat.Shell.zip",
         "https://gh-proxy.com/https://github.com/panxian-AI/ArkLink/releases/download/napcat-shell/NapCat.Shell.zip",
