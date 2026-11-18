@@ -195,6 +195,15 @@ pick_mirror() { # $1=镜像列表 $2=测试文件路径
 }
 
 # ------------------------------------------------------------------ 取包
+# 所有必需产物都托管在 GitHub（ArkLink 仓库 dist-v1），第三方镜像只作兜底——
+# 镜像站改路径/限速/挂掉都不再影响安装。
+GH_DIST="https://github.com/panxian-AI/ArkLink/releases/download/dist-v1"
+gh_urls() { # $1=文件名 → 依次输出 gh-proxy / ghfast / 直连
+  echo "https://gh-proxy.com/$GH_DIST/$1"
+  echo "https://ghfast.top/$GH_DIST/$1"
+  echo "$GH_DIST/$1"
+}
+
 fetch_pkg() { # $1=文件名 $2=落地路径  $3=失败是否致命（die|warn），默认 die
   local name="$1" dest="$2" fatal="${3:-die}"
   if [ -n "$LOCAL" ] && http GET "$LOCAL/f/$name" > "$dest" && [ -s "$dest" ]; then
@@ -203,11 +212,9 @@ fetch_pkg() { # $1=文件名 $2=落地路径  $3=失败是否致命（die|warn�
   fi
   case "$name" in
     ubuntu-rootfs.tar.gz)
-      for u in \
+      for u in $(gh_urls ubuntu-rootfs.tar.gz) \
         "https://mirrors.tuna.tsinghua.edu.cn/ubuntu-cdimage/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.5-base-arm64.tar.gz" \
-        "https://mirrors.aliyun.com/ubuntu-cdimage/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.5-base-arm64.tar.gz" \
-        "https://mirrors.ustc.edu.cn/ubuntu-cdimage/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.5-base-arm64.tar.gz" \
-        "https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.5-base-arm64.tar.gz"
+        "https://mirrors.aliyun.com/ubuntu-cdimage/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.5-base-arm64.tar.gz"
       do
         if curl -fsSL -m 1800 -o "$dest" "$u"; then
           ok "自己下到 rootfs（$(echo "$u" | cut -d/ -f3)）"
@@ -216,10 +223,8 @@ fetch_pkg() { # $1=文件名 $2=落地路径  $3=失败是否致命（die|warn�
       done
       ;;
     astrbot.tar.gz)
-      for u in \
-        "https://gh-proxy.com/https://codeload.github.com/AstrBotDevs/AstrBot/tar.gz/refs/heads/master" \
-        "https://ghfast.top/https://codeload.github.com/AstrBotDevs/AstrBot/tar.gz/refs/heads/master" \
-        "https://codeload.github.com/AstrBotDevs/AstrBot/tar.gz/refs/heads/master"
+      for u in $(gh_urls astrbot.tar.gz) \
+        "https://gh-proxy.com/https://codeload.github.com/AstrBotDevs/AstrBot/tar.gz/refs/heads/master"
       do
         if curl -fsSL -m 1800 -o "$dest" "$u"; then
           ok "自己下到 AstrBot 源码（$(echo "$u" | cut -d/ -f3)）"
@@ -252,10 +257,8 @@ fetch_pkg() { # $1=文件名 $2=落地路径  $3=失败是否致命（die|warn�
       done
       ;;
     arklink.tar.gz)
-      for u in \
-        "https://gh-proxy.com/https://codeload.github.com/panxian-AI/ArkLink/tar.gz/refs/heads/main" \
-        "https://ghfast.top/https://codeload.github.com/panxian-AI/ArkLink/tar.gz/refs/heads/main" \
-        "https://codeload.github.com/panxian-AI/ArkLink/tar.gz/refs/heads/main"
+      for u in $(gh_urls arklink.tar.gz) \
+        "https://gh-proxy.com/https://codeload.github.com/panxian-AI/ArkLink/tar.gz/refs/heads/main"
       do
         if curl -fsSL -m 1800 -o "$dest" "$u"; then
           ok "自己下到 ArkLink 源码（$(echo "$u" | cut -d/ -f3)）"
@@ -422,7 +425,10 @@ set -e
 cd /root/AstrBot
 export UV_PYTHON_DOWNLOADS=never
 export UV_DEFAULT_INDEX=$PY_INDEX
-uv sync --python /usr/bin/python3
+# Android 文件系统不支持硬链接（proot 只是模拟），uv 默认的 hardlink 装法会报
+# 'failed to hardlink file ... Invalid argument (os error 22)'。改成复制。
+export UV_LINK_MODE=copy
+uv sync --python /usr/bin/python3 --link-mode copy
   " || die "uv sync 失败。重跑本脚本会接着来（已下的不会重下）"
   ok "依赖装完"
 else
