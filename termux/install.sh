@@ -121,13 +121,13 @@ die()  {
 }
 
 # ------------------------------------------------------------------ 入口
-[ -d /data/data/com.termux ] || { echo "这个脚本要在 Termux 里跑"; exit 1; }
+[ -d /data/data/com.termux/files/usr ] || { echo "这个脚本要在 Termux 环境里跑"; exit 1; }
 mkdir -p "$STATE"
 : > "$LOGF"
 # 从这一行起，所有输出（stdout+stderr）都会实时回传 App 并落 install.log
 exec > >(upload_lines) 2>&1
 
-[ -d /data/data/com.termux/files ] || die "Termux 环境不完整，先打开一次 Termux 让它跑完 bootstrap"
+[ -d /data/data/com.termux/files/usr ] || die "Termux 环境不完整（bootstrap 没解压好）"
 
 # 互斥锁：安装按钮被连点时第二个进来直接退出并说明情况；
 # 锁超过 3 小时视为上次被强杀残留，自动清掉

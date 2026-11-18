@@ -144,7 +144,6 @@ public class MainActivity extends AppCompatActivity {
         wire();
         showVersion();
         askNotificationPermission();
-        askRunCommandPermission();
 
         bg.execute(() -> {
             try {
@@ -158,9 +157,9 @@ public class MainActivity extends AppCompatActivity {
         if (!welcomed) {
             welcomed = true;
             LogBus.append("ArkDroid 已就绪。中继直接跑在本 App 里（Chaquopy + ArkBridge）。");
-            Term.note("第一次用：点「一键下载全部」→ 装 Termux → 点「安装 / 更新」。");
+            Term.note("第一次用：点「一键下载全部」→ 点「安装 / 更新」（Termux 运行时已内置，不用再装别的 App）。");
             if (!Termux.installed(this)) {
-                LogBus.append("没检测到 Termux：只想手机当中继可以不管；要跑 AstrBot 就得装。");
+                LogBus.append("Termux 运行时还没解压：只想手机当中继可以不管；要跑 AstrBot 就先点「安装 / 更新」。");
             }
         }
         if (prefs.autostart() && !BridgeService.running) {
@@ -382,14 +381,15 @@ public class MainActivity extends AppCompatActivity {
         }
 
         if (!Termux.installed(this)) {
-            txtAstrState.setText("没装 Termux。AstrBot 依赖的是 glibc 轮子，Android 原生装不上，"
-                    + "要跑它得先装下载卡里的 ArkTerm，再回来点「安装 / 更新」。");
+            txtAstrState.setText(Termux.installing(this)
+                    ? "Termux 运行时正在解压，几秒后就能用了。"
+                    : "运行时没就绪。先在下载卡点「一键下载全部」，再点「安装 / 更新」。");
             txtAstrState.setTextColor(getColor(R.color.warn));
         } else if (astrUp) {
             txtAstrState.setText("面板在线 · " + PANEL_URL);
             txtAstrState.setTextColor(getColor(R.color.ok));
         } else {
-            txtAstrState.setText("Termux 已就绪，面板没响应（还没装完，或者没启动）");
+            txtAstrState.setText("运行时就绪，面板没响应（还没装完，或者没启动）");
             txtAstrState.setTextColor(getColor(R.color.muted));
         }
 
@@ -523,33 +523,29 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void installAstrBot() {
-        Catalog.Item apk = Catalog.find(this, "termux");
+        Catalog.Item bs = Catalog.find(this, "bootstrap");
         if (!Termux.installed(this)) {
-            if (apk != null && apk.ready(this)) {
-                Termux.installApk(this, apk.target(this));
-                toast("装好 ArkTerm 并打开它一次后，回来点「安装 / 更新」");
+            if (bs == null || !bs.ready(this)) {
+                new AlertDialog.Builder(this)
+                        .setTitle("先下载运行时")
+                        .setMessage("Termux 运行时（bootstrap，约 32 MB）还没下好。"
+                                + "去下载卡点「一键下载全部」，或单独点清单里「Termux 运行时」那一行。")
+                        .setNegativeButton("取消", null)
+                        .setPositiveButton("去下载", (d, w) -> {
+                            jumpTo(cardDl);
+                            if (bs != null) {
+                                startDownload(java.util.Collections.singletonList("bootstrap"));
+                            } else {
+                                startDownload(null);
+                            }
+                        })
+                        .show();
                 return;
             }
-            showTermuxHelp();
-            return;
-        }
-        if (!hasRunCommandPermission()) {
-            requestPermissions(new String[]{PERM_RUN_COMMAND}, 9);
-            toast("Termux 刚装好或重装过，允许弹出的「RUN_COMMAND」权限后，再点一次");
-            return;
-        }
-        if (Termux.needsFirstLaunch(this)) {
-            new AlertDialog.Builder(this)
-                    .setTitle("先打开一次 ArkTerm")
-                    .setMessage("ArkTerm 刚装好还没启动过，系统暂时不允许别的 App 给它发命令；"
-                            + "而且第一次启动它会自动装好 bash / curl 等基础命令（必需的一步）。\n\n"
-                            + "点「打开 ArkTerm」，等屏幕出现「~ $」提示符后，回到本 App 再点一次「安装 / 更新」。")
-                    .setNegativeButton("稍后", null)
-                    .setPositiveButton("打开 ArkTerm", (d, w) -> {
-                        Termux.markLaunched(this);
-                        Termux.launch(this);
-                    })
-                    .show();
+            // bootstrap 已下好，直接解压 + 装下去
+            Term.note("=== 开始安装 AstrBot ===");
+            boolean ok = Termux.install(this);
+            toast(ok ? "正在解压运行时并开始安装，进度看下面终端" : "安装没启动，看日志");
             return;
         }
         boolean allReady = Downloads.allReady(this);
@@ -561,12 +557,12 @@ public class MainActivity extends AppCompatActivity {
                 .setMessage(extra
                         + "流程：解 Ubuntu 根文件系统到手机（proot，不用 root）→ 装 Python 3.12 + uv → "
                         + "解 AstrBot → 装依赖。总占用约 2.5 GB，挂 WiFi。\n\n"
-                        + "装完会注册 astr 命令。进度条在导航条下面，实时输出在「终端」窗里，不用切去 Termux。")
+                        + "装完会注册 astr 命令。进度条在导航条下面，实时输出在「终端」窗里。")
                 .setNegativeButton("取消", null)
                 .setPositiveButton("开始", (dialog, which) -> {
                     Term.note("=== 开始安装 AstrBot ===");
                     boolean ok = Termux.install(this);
-                    toast(ok ? "已交给 Termux，进度看下面终端" : "发送失败，看日志");
+                    toast(ok ? "已开始，进度看下面终端" : "安装没启动，看日志");
                 })
                 .show();
     }
@@ -599,29 +595,10 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    /** 发命令前统一检查：Termux 在不在 + RUN_COMMAND 权限还在不在（重装 Termux 会被撤销）。 */
+    /** 发命令前统一检查：bootstrap 解压好了没有。 */
     private boolean readyToSend() {
         if (!Termux.installed(this)) {
             showTermuxHelp();
-            return false;
-        }
-        if (!hasRunCommandPermission()) {
-            requestPermissions(new String[]{PERM_RUN_COMMAND}, 9);
-            toast("Termux 刚装好或重装过，系统把授权撤了——允许弹出的「RUN_COMMAND」权限后，再点一次");
-            return false;
-        }
-        if (Termux.needsFirstLaunch(this)) {
-            new AlertDialog.Builder(this)
-                    .setTitle("先打开一次 ArkTerm")
-                    .setMessage("ArkTerm 刚装好还没启动过，系统暂时不允许别的 App 给它发命令；"
-                            + "而且第一次启动它会自动装好 bash / curl 等基础命令（必需的一步）。\n\n"
-                            + "点「打开 ArkTerm」，等屏幕出现「~ $」提示符后，回到本 App 再点一次刚才的按钮。")
-                    .setNegativeButton("稍后", null)
-                    .setPositiveButton("打开 ArkTerm", (d, w) -> {
-                        Termux.markLaunched(this);
-                        Termux.launch(this);
-                    })
-                    .show();
             return false;
         }
         return true;
@@ -637,13 +614,12 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    /** 发命令失败的统一提示：装官方 Termux 的引导去换 ArkTerm。 */
+    /** 发命令失败的统一提示。 */
     private void toastSendFail() {
-        if (Termux.installed(this) && !Termux.isArkTerm(this)) {
-            toast("命令没发出去。装的是官方 Termux（默认拒外部命令），"
-                    + "点 Termux 卡的「帮助」按引导换 ArkTerm");
+        if (Termux.installing(this)) {
+            toast("bootstrap 还在解压，等几秒再试");
         } else {
-            toast("命令没发出去，ArkTerm 可能还没启动过一次，先打开它再回这里");
+            toast("命令没能执行，看「运行日志」里的提示");
         }
     }
 
@@ -771,54 +747,23 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showTermuxHelp() {
-        boolean hasTermux = Termux.installed(this);
-        boolean isArk = Termux.isArkTerm(this);
-        final Catalog.Item apk = Catalog.find(this, "termux");
-        final boolean apkReady = apk != null && apk.ready(this);
+        boolean partial = Termux.installing(this);
         String message;
-        String posTitle;
-        if (isArk) {
-            // ArkTerm 已装：授权内置，什么都不用配
-            message = "ArkTerm 已装好，外部应用授权是内置的，\n"
-                    + "什么都不用配，直接点「安装 / 更新」或发命令就行。";
-            posTitle = "打开 ArkTerm";
-        } else if (hasTermux) {
-            // 官方 Termux：最省事的路线是卸掉换 ArkTerm
-            message = "检测到装的是官方 Termux，它默认不允许外部应用发命令，"
-                    + "所以所有命令都会被拒（allow-external-apps 没开）。\n\n"
-                    + "最省事的做法：卸载官方 Termux，然后从 App 的「下载」卡装 ArkTerm"
-                    + "（我们重打包的 Termux，授权已内置，装上即用零配置）。\n\n"
-                    + "或者保留官方 Termux，在它里面执行一次：\n"
-                    + "   echo \"allow-external-apps=true\" >> ~/.termux/termux.properties\n"
-                    + "然后点 Termux 设置里的 reload（或重启 Termux）。";
-            posTitle = apkReady ? "装 ArkTerm" : "下载 ArkTerm";
+        if (partial) {
+            message = "Termux 运行时正在解压（bootstrap 约 32 MB，几秒钟就好）。"
+                    + "等一下再点刚才的按钮；解压失败的重新点「安装 / 更新」会自动重解。";
         } else {
-            // 什么都没装：直接引导装 ArkTerm
             message = "AstrBot 的依赖（faiss / pandas / watchfiles 等）只有 glibc 轮子，"
                     + "Android 原生环境装不上，官方也是 Termux + proot Ubuntu 这条路。\n\n"
-                    + "推荐装 ArkTerm：我们重打包的 Termux，外部应用授权已内置，"
-                    + "装上即用，不用敲任何配置命令。\n\n"
-                    + (apkReady
-                    ? "ArkTerm 的安装包已经下好了，点下面直接装。"
-                    : "点下面的按钮，App 会自己挑最快的镜像下好再拉起安装器，不用去浏览器。");
-            posTitle = apkReady ? "开始安装" : "下载 ArkTerm";
+                    + "Termux 运行时已经内置在本 App 里（v0.4.0 起不用再装 ArkTerm）："
+                    + "先在下载卡点「一键下载全部」（含 bootstrap 约 32 MB），"
+                    + "然后点「安装 / 更新」就会自动解压并开始安装。";
         }
         new AlertDialog.Builder(this)
-                .setTitle(isArk ? "ArkTerm 已就绪" : (hasTermux ? "官方 Termux 缺授权" : "装 ArkTerm（内置版 Termux）"))
+                .setTitle(partial ? "运行时正在解压" : "还没装 AstrBot 运行时")
                 .setMessage(message)
                 .setNegativeButton("知道了", null)
-                .setPositiveButton(posTitle, (dialog, which) -> {
-                    if (isArk) {
-                        Termux.launch(this);
-                        return;
-                    }
-                    if (apkReady) {
-                        Termux.installApk(this, apk.target(this));
-                    } else {
-                        startDownload(java.util.Collections.singletonList("termux"));
-                    }
-                })
-                .setNeutralButton("打开 Termux", (dialog, which) -> Termux.launch(this))
+                .setPositiveButton("去下载卡", (dialog, which) -> jumpTo(cardDl))
                 .show();
     }
 
@@ -827,23 +772,6 @@ public class MainActivity extends AppCompatActivity {
                 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
                 != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 7);
-        }
-    }
-
-    /**
-     * Termux 的 RUN_COMMAND 是危险权限：卸载重装 Termux 后，本 App 拿到的授权会被系统
-     * 静默撤销（日志表现为 SecurityException "without permission
-     * com.termux.permission.RUN_COMMAND"）。所以启动时和每次发命令前都查一遍，缺就弹窗。
-     */
-    static final String PERM_RUN_COMMAND = "com.termux.permission.RUN_COMMAND";
-
-    private boolean hasRunCommandPermission() {
-        return checkSelfPermission(PERM_RUN_COMMAND) == PackageManager.PERMISSION_GRANTED;
-    }
-
-    private void askRunCommandPermission() {
-        if (Termux.installed(this) && !hasRunCommandPermission()) {
-            requestPermissions(new String[]{PERM_RUN_COMMAND}, 9);
         }
     }
 
