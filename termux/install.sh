@@ -198,8 +198,11 @@ else
   ok "apt 源 → 清华（默认）"
 fi
 echo "  （apt 正在更新索引、装 proot/curl；出现 Get: … / Setting up … 都是正常进度）"
-pkg update -y || warn "pkg update 有报错，继续试"
-pkg install -y proot tar xz-utils curl ca-certificates || die "装 proot 失败，检查网络后重试"
+# 注意：本环境里 proot -0 把 uid 伪装成 root，Termux 的 pkg 壳会拒绝
+# "Cannot run 'pkg' command as root"，所以直接用 apt-get（pkg 只是它的封装）
+apt-get update -y || warn "apt update 有报错，继续试"
+apt-get install -y -o APT::Sandbox::User=root proot tar xz-utils curl ca-certificates \
+  || die "装 proot 失败，检查网络后重试"
 ok "proot / tar / curl 就绪"
 
 # ------------------------------------------------------------------ 取包
