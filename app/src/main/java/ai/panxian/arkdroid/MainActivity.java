@@ -15,7 +15,6 @@ import android.os.Looper;
 import android.provider.Settings;
 import android.view.View;
 import android.widget.ProgressBar;
-import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -47,7 +46,7 @@ public class MainActivity extends AppCompatActivity {
     private TextView txtAstrState;
     private TextView txtStats;
     private TextView txtLog;
-    private ScrollView logScroll;
+    private NestedScrollView logScroll;
     private SwitchMaterial swAutostart;
     private TextInputEditText inpArklink;
     private TextInputEditText inpAstrbot;
@@ -59,7 +58,7 @@ public class MainActivity extends AppCompatActivity {
     private TextView txtDlState;
     private TextView txtCreds;
     private TextView txtTerm;
-    private ScrollView termScroll;
+    private NestedScrollView termScroll;
     private TextInputEditText inpCmd;
     private NestedScrollView scroller;
     private View cardBridge;
@@ -77,6 +76,13 @@ public class MainActivity extends AppCompatActivity {
     private boolean credsAuto;
     private boolean dlDoneNotice;
 
+    /**
+     * 是否"跟随最新"：用户在底部就往新内容走，往上翻看历史就不打扰。
+     * 由滚动回调维护——比每次输出前临时算一次可靠（内容变高前那一刻算不出真实位置）。
+     */
+    private boolean termFollow = true;
+    private boolean logFollow = true;
+
     private final Runnable termRefresh = new Runnable() {
         @Override
         public void run() {
@@ -85,39 +91,68 @@ public class MainActivity extends AppCompatActivity {
             }
             String text = Term.text();
             if (!text.contentEquals(txtTerm.getText())) {
-                boolean bottom = watching(termScroll);
+                // 滚底交给 txtTerm 的 layout 回调：setText 之后要等下一轮排版才知道新内容
+                // 的真实高度，在这里直接 fullScroll 滚的还是旧高度（表现为"不往下走"）。
                 txtTerm.setText(text);
-                if (bottom) {
-                    termScroll.post(() -> termScroll.fullScroll(View.FOCUS_DOWN));
-                }
             }
         }
     };
 
     /** 用户停在底部附近才算"在看最新"，翻上去看历史就不动他的位置。 */
-    private boolean atBottom(ScrollView sv) {
+    private boolean atBottom(NestedScrollView sv) {
         if (sv == null || sv.getChildCount() == 0) {
             return true;
         }
-        int bottom = sv.getChildAt(0).getBottom();
+        int bottom = sv.getChildAt(0).getBottom() + sv.getPaddingBottom();
         return bottom - (sv.getHeight() + sv.getScrollY()) < 100;
     }
 
     /**
-     * 只有终端/日志卡大半落在屏幕里且内层滚到了底部，才允许自动滚底。
-     * 页面滚到别的卡上时，内层 ScrollView 自己仍是"底部"状态，若不加这道判断，
-     * 每次输出 fullScroll 都会顺着 view 树把外层页面拽回终端卡——表现为
-     * "一有输出整页就跳过去"。
+     * 内容变高时把内层滚到底。
+     *
+     * <p>用 scrollTo 而不是 fullScroll：fullScroll 会为了"露出最后一个焦点控件"去请求
+     * 祖先一起滚，页面滚到别的卡上时就会被拽回终端卡。直接改内层 scrollY 只动这一块。
      */
-    private boolean watching(ScrollView sv) {
-        if (sv == null || !atBottom(sv)) {
-            return false;
+    /** 把内层滚到底（只改自己的 scrollY，不惊动外层页面）。 */
+    private void pinBottom(NestedScrollView sv) {
+        if (sv == null || sv.getChildCount() == 0) {
+            return;
         }
-        android.graphics.Rect r = new android.graphics.Rect();
-        if (!sv.getGlobalVisibleRect(r)) {
-            return false; // 完全在屏幕外
+        int content = sv.getChildAt(0).getHeight()
+                + sv.getPaddingTop() + sv.getPaddingBottom();
+        sv.scrollTo(0, Math.max(0, content - sv.getHeight()));
+    }
+
+    private void setupFollow(final NestedScrollView sv, final TextView tv) {
+        sv.setOnScrollChangeListener((NestedScrollView.OnScrollChangeListener)
+                (v, x, y, ox, oy) -> {
+                    boolean bottom = atBottom(sv);
+                    if (sv == termScroll) {
+                        termFollow = bottom;
+                    } else if (sv == logScroll) {
+                        logFollow = bottom;
+                    }
+                });
+        tv.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> {
+            if (b - t <= ob - ot) {
+                return; // 没变高，不需要滚
+            }
+            boolean follow = sv == termScroll ? termFollow : logFollow;
+            if (!follow) {
+                return;
+            }
+            sv.post(() -> pinBottom(sv));
+        });
+    }
+
+    /** 长按整块复制：终端/日志关掉了文本选择（它会把拖动手势吃掉），复制走长按。 */
+    private void copyAllLabelled(CharSequence text, String what) {
+        android.content.ClipboardManager cm =
+                (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+        if (cm != null) {
+            cm.setPrimaryClip(android.content.ClipData.newPlainText("ArkDroid", text));
+            toast("已复制" + what + "全部内容");
         }
-        return r.height() >= sv.getHeight() * 3 / 4;
     }
 
     private final Runnable credsRefresh = new Runnable() {
@@ -134,11 +169,7 @@ public class MainActivity extends AppCompatActivity {
         public void run() {
             String text = LogBus.text();
             if (!text.contentEquals(txtLog.getText())) {
-                boolean bottom = watching(logScroll);
                 txtLog.setText(text);
-                if (bottom) {
-                    logScroll.post(() -> logScroll.fullScroll(View.FOCUS_DOWN));
-                }
             }
         }
     };
@@ -242,14 +273,19 @@ public class MainActivity extends AppCompatActivity {
         txtInstallHint = findViewById(R.id.txtInstallHint);
         dlList = findViewById(R.id.dlList);
 
-        // 外层 NestedScrollView 会把触摸事件抢走，内层终端/日志就滑不动。
-        // 按到内层时告诉父级别拦截，事件继续正常分发。
-        View.OnTouchListener passThrough = (v, ev) -> {
-            v.getParent().requestDisallowInterceptTouchEvent(true);
-            return false;
-        };
-        termScroll.setOnTouchListener(passThrough);
-        logScroll.setOnTouchListener(passThrough);
+        // 内层是 NestedScrollView：拖动先滚这一块，滚到边界再交给外层页面接力，
+        // 不需要再手动 requestDisallowInterceptTouchEvent（那样反而会让手指在终端里
+        // 划不动整页）。文本也不再设为可选——可选文本会把拖动手势抢去做选区。
+        setupFollow(termScroll, txtTerm);
+        setupFollow(logScroll, txtLog);
+        txtTerm.setOnLongClickListener(v -> {
+            copyAllLabelled(Term.text(), "终端");
+            return true;
+        });
+        txtLog.setOnLongClickListener(v -> {
+            copyAllLabelled(LogBus.text(), "日志");
+            return true;
+        });
     }
 
     /** 顶部导航：把对应卡片滚到可视区，别让人靠猜「功能在哪」。 */
@@ -605,6 +641,8 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         inpCmd.setText("");
+        // 用户主动发了命令，就是要看输出：重新跟随最新（之前翻历史留下的暂停状态清掉）
+        termFollow = true;
         Term.note("$ " + command);
         BridgeService.serve(this);
         if (!Termux.send(this, command, 900)) {
@@ -625,6 +663,7 @@ public class MainActivity extends AppCompatActivity {
         if (!readyToSend()) {
             return;
         }
+        termFollow = true;
         BridgeService.serve(this);
         if (!Termux.astr(this, command.replaceFirst("^astr ", ""))) {
             toastSendFail();

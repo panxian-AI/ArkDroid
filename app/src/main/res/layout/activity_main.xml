@@ -835,7 +835,7 @@
                         android:text="清空" />
                 </LinearLayout>
 
-                <ScrollView
+                <androidx.core.widget.NestedScrollView
                     android:id="@+id/termScroll"
                     android:layout_width="match_parent"
                     android:layout_height="200dp"
@@ -850,9 +850,9 @@
                         android:layout_height="wrap_content"
                         android:fontFamily="monospace"
                         android:textColor="#B7C3D0"
-                        android:textIsSelectable="true"
+                        android:textIsSelectable="false"
                         android:textSize="11sp" />
-                </ScrollView>
+                </androidx.core.widget.NestedScrollView>
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -955,7 +955,7 @@
                         android:text="清空" />
                 </LinearLayout>
 
-                <ScrollView
+                <androidx.core.widget.NestedScrollView
                     android:id="@+id/logScroll"
                     android:layout_width="match_parent"
                     android:layout_height="260dp"
@@ -970,9 +970,9 @@
                         android:layout_height="wrap_content"
                         android:fontFamily="monospace"
                         android:textColor="#B7C3D0"
-                        android:textIsSelectable="true"
+                        android:textIsSelectable="false"
                         android:textSize="11sp" />
-                </ScrollView>
+                </androidx.core.widget.NestedScrollView>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
