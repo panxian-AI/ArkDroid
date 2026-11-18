@@ -68,22 +68,38 @@ final class Catalog {
         return dir;
     }
 
-    /** 有线上清单就用线上的，否则用 APK 里带的那份。 */
+    /** 内置清单比缓存的版本新时优先用内置的（老缓存可能是旧定义，别让旧条目压过新修复）。 */
     static List<Item> items(Context ctx) {
+        String builtIn = null;
+        try (InputStream in = ctx.getAssets().open("manifest.json")) {
+            builtIn = new String(readAll(in), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            LogBus.append("内置清单读不到：" + e.getMessage());
+        }
         File cached = new File(ctx.getFilesDir(), "manifest.json");
         if (cached.exists()) {
             try {
-                return parse(new String(readAll(new FileInputStream(cached)), StandardCharsets.UTF_8));
+                String cacheText =
+                        new String(readAll(new FileInputStream(cached)), StandardCharsets.UTF_8);
+                int builtV = builtIn == null ? 0
+                        : new JSONObject(builtIn).optInt("version", 0);
+                int cacheV = new JSONObject(cacheText).optInt("version", 0);
+                if (cacheV >= builtV) {
+                    return parse(cacheText);
+                }
+                LogBus.append("内置清单比缓存新（v" + builtV + " > v" + cacheV + "），用内置的");
             } catch (Exception e) {
                 LogBus.append("本地清单读坏了，改用内置的：" + e.getMessage());
             }
         }
-        try (InputStream in = ctx.getAssets().open("manifest.json")) {
-            return parse(new String(readAll(in), StandardCharsets.UTF_8));
-        } catch (IOException e) {
-            LogBus.append("内置清单读不到：" + e.getMessage());
-            return new ArrayList<>();
+        if (builtIn != null) {
+            try {
+                return parse(builtIn);
+            } catch (IOException ignored) {
+                // 走到下面的兜底
+            }
         }
+        return new ArrayList<>();
     }
 
     static Item find(Context ctx, String id) {

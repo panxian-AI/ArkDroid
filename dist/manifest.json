@@ -1,5 +1,5 @@
 {
-  "version": 4,
+  "version": 5,
   "updated": "2026-11-18",
   "note": "App 会并发测速后挑最快的镜像下载；改这个文件不用重发 APK（App 启动时会尝试拉一次线上的）。",
   "components": [
@@ -77,10 +77,10 @@
     {
       "id": "astrbot",
       "title": "AstrBot 源码",
-      "desc": "跟着 master 走，装了可以再更新",
+      "desc": "AstrBot 主程序源码（GitHub 分支快照，大小随上游更新变化，不做精确校验）",
       "file": "astrbot.tar.gz",
       "kind": "tar",
-      "size": 9136842,
+      "size": 0,
       "sha256": "",
       "mirrors": [
         "https://gh-proxy.com/https://codeload.github.com/AstrBotDevs/AstrBot/tar.gz/refs/heads/master",

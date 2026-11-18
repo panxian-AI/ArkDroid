@@ -85,7 +85,7 @@ public class MainActivity extends AppCompatActivity {
             }
             String text = Term.text();
             if (!text.contentEquals(txtTerm.getText())) {
-                boolean bottom = atBottom(termScroll);
+                boolean bottom = watching(termScroll);
                 txtTerm.setText(text);
                 if (bottom) {
                     termScroll.post(() -> termScroll.fullScroll(View.FOCUS_DOWN));
@@ -103,6 +103,23 @@ public class MainActivity extends AppCompatActivity {
         return bottom - (sv.getHeight() + sv.getScrollY()) < 100;
     }
 
+    /**
+     * 只有终端/日志卡大半落在屏幕里且内层滚到了底部，才允许自动滚底。
+     * 页面滚到别的卡上时，内层 ScrollView 自己仍是"底部"状态，若不加这道判断，
+     * 每次输出 fullScroll 都会顺着 view 树把外层页面拽回终端卡——表现为
+     * "一有输出整页就跳过去"。
+     */
+    private boolean watching(ScrollView sv) {
+        if (sv == null || !atBottom(sv)) {
+            return false;
+        }
+        android.graphics.Rect r = new android.graphics.Rect();
+        if (!sv.getGlobalVisibleRect(r)) {
+            return false; // 完全在屏幕外
+        }
+        return r.height() >= sv.getHeight() * 3 / 4;
+    }
+
     private final Runnable credsRefresh = new Runnable() {
         @Override
         public void run() {
@@ -117,7 +134,7 @@ public class MainActivity extends AppCompatActivity {
         public void run() {
             String text = LogBus.text();
             if (!text.contentEquals(txtLog.getText())) {
-                boolean bottom = atBottom(logScroll);
+                boolean bottom = watching(logScroll);
                 txtLog.setText(text);
                 if (bottom) {
                     logScroll.post(() -> logScroll.fullScroll(View.FOCUS_DOWN));
