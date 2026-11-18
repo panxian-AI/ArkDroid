@@ -16,3 +16,4 @@
 # 构建时从 dist/ 与 termux/ 同步进来的
 /app/src/main/assets/manifest.json
 /app/src/main/assets/termux/
+__pycache__/
