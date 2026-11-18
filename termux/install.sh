@@ -376,17 +376,18 @@ ok "Ubuntu 入口写好：$STATE/proot-run.sh（命令交给 App 起平级 proot
 step "2.5/9 dpkg 半配置自愈"
 "$STATE/proot-run.sh" /bin/bash -c '
 export DEBIAN_FRONTEND=noninteractive
+# 清理可能的残留锁（上次安装中途被杀会留下，apt 会永远等锁）
+rm -f /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/cache/apt/archives/lock
 # 注意：不能用 confmodule 文件判断——镜像里可能残留 confmodule 而 debconf 包本体缺失
 if [ ! -x /usr/share/debconf/frontend ] || ! dpkg-query -W -f="${Status}" debconf 2>/dev/null | grep -q "install ok installed"; then
-  echo "  debconf 缺失/不完整（postinst 会崩），先单独补装"
-  apt-get update -qq || true
-  (cd /tmp && apt-get download debconf >/dev/null 2>&1 \
-     && dpkg -i /tmp/debconf_*.deb >/dev/null 2>&1) \
-     || apt-get install -y debconf || true
+  echo "  debconf 缺失/不完整，尝试补装（每步最多等 3 分钟，失败走兜底）"
+  timeout 180 apt-get update -q || echo "  apt update 超时/失败，继续"
+  (cd /tmp && timeout 180 apt-get download debconf && dpkg -i /tmp/debconf_*.deb) \
+    || echo "  在线补装没成功"
   rm -f /tmp/debconf_*.deb
 fi
 if [ ! -x /usr/share/debconf/frontend ]; then
-  echo "  debconf 还是没装上，用空 frontend 兜底（跳过交互提问，用默认值）"
+  echo "  用空 frontend 兜底（跳过交互提问，用默认值）"
   mkdir -p /usr/share/debconf
   cat > /usr/share/debconf/frontend <<EOF2
 #!/bin/sh
@@ -394,9 +395,9 @@ exit 0
 EOF2
   chmod +x /usr/share/debconf/frontend
 fi
-dpkg --configure -a || echo "  dpkg --configure -a 仍有报错，交给后续 apt 再试"
+timeout 600 dpkg --configure -a || echo "  dpkg --configure -a 仍有报错，交给后续 apt 再试"
 # 空 frontend 路径下 ca-certificates 的证书包可能没重建，补一次
-command -v update-ca-certificates >/dev/null 2>&1 && update-ca-certificates --fresh >/dev/null 2>&1 || true
+command -v update-ca-certificates >/dev/null 2>&1 && timeout 300 update-ca-certificates --fresh >/dev/null 2>&1 || true
 '
 ok "dpkg 状态自检完成"
 
