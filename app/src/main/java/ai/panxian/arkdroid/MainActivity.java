@@ -241,8 +241,16 @@ public class MainActivity extends AppCompatActivity {
                 BridgeService.start(this);
             }
             Termux.send(this,
-                    "if [ -f \"$HOME/.arkdroid/rootfs/root/AstrBot/main.py\" ]; then astr start; fi;"
-                            + " if [ -f \"$HOME/.arkdroid/rootfs/opt/QQ/qq\" ]; then qq start; fi",
+                    // 1) 先把 App 内置脚本刷新到 ~/.arkdroid（发新版只装 APK 即生效，不用点安装/更新）
+                    "mkdir -p \"$HOME/.arkdroid\""
+                            + "; for f in arknet.sh install.sh astr qq arklink creds.py setpw.py; do"
+                            + " curl -fsSL -m 60 -o \"$HOME/.arkdroid/$f\" \"$ARKDROID_LOCAL/a/termux/$f\" 2>/dev/null || true; done"
+                            + "; chmod +x \"$HOME/.arkdroid/install.sh\" \"$HOME/.arkdroid/astr\""
+                            + " \"$HOME/.arkdroid/qq\" \"$HOME/.arkdroid/arklink\" 2>/dev/null"
+                            + "; for c in astr qq arklink; do ln -sf \"$HOME/.arkdroid/$c\" \"$PREFIX/bin/$c\" 2>/dev/null; done"
+                            // 2) 幂等拉起服务：装好的才起
+                            + "; if [ -f \"$HOME/.arkdroid/rootfs/root/AstrBot/main.py\" ]; then astr start; fi"
+                            + "; if [ -f \"$HOME/.arkdroid/rootfs/opt/QQ/qq\" ]; then qq start; fi",
                     180);
             LogBus.append("已自动拉起 AstrBot / NapCat（装好的才会起；幂等，重复无害）");
         }), 4000);
@@ -410,7 +418,7 @@ public class MainActivity extends AppCompatActivity {
                 return;
             }
             jumpTo(cardQq);
-            Term.note("$ qq start; arklink start");
+            Term.note("$ qq start");
             NapCat.start(this);
             toast("QQ（无头）和 ArkLink 正在启动，稍后看状态");
         });

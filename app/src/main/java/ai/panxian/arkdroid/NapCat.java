@@ -70,11 +70,11 @@ final class NapCat {
                 60);
     }
 
-    /** 启动整条本机链路（QQ 无头 + NapCat + ArkLink）。 */
+    /** 启动本机 QQ 链路（QQ 无头 + NapCat，OneBot 3001 直连，不需要 ArkLink）。 */
     static boolean start(Context ctx) {
         BridgeService.serve(ctx);
         return Termux.send(ctx,
-                "~/.arkdroid/qq start; ~/.arkdroid/arklink start",
+                "~/.arkdroid/qq start",
                 300);
     }
 

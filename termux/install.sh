@@ -487,8 +487,27 @@ if [ -z "$APPDIR" ]; then
 fi
 [ -n "$APPDIR" ] || { echo "NO_APPDIR"; exit 4; }
 echo "  QQ app 目录：$APPDIR"
-if grep -q "napcat/loadNapCat.js" "$APPDIR/package.json" 2>/dev/null; then
-  echo "  NapCat 已注入，跳过"
+NAPCAT_DIR="$APPDIR/app_launcher/napcat"
+fix_loader() { # .js 加载器在 type:module 目录里会被当 ESM 拆崩（require is not defined）→ 改 .cjs
+  if [ -f "$NAPCAT_DIR/loadNapCat.js" ] && grep -q '"type" *: *"module"' "$NAPCAT_DIR/package.json" 2>/dev/null; then
+    mv "$NAPCAT_DIR/loadNapCat.js" "$NAPCAT_DIR/loadNapCat.cjs"
+    echo "  加载器已改名为 loadNapCat.cjs（CommonJS，避开 ESM 坑）"
+  fi
+}
+if [ -f "$NAPCAT_DIR/loadNapCat.cjs" ] && grep -q "napcat/loadNapCat.cjs" "$APPDIR/package.json" 2>/dev/null; then
+  echo "  NapCat 已注入（cjs），跳过"
+elif [ -f "$NAPCAT_DIR/loadNapCat.js" ] && grep -q "napcat/loadNapCat.js" "$APPDIR/package.json" 2>/dev/null; then
+  # 旧版注入的坏状态：修 loader 后缀 + 改 main 指向
+  fix_loader
+  python3 - "$APPDIR/package.json" <<'"'"'P'"'"'
+import json, sys
+p = sys.argv[1]
+d = json.load(open(p, encoding="utf-8"))
+d["main"] = "./app_launcher/napcat/loadNapCat.cjs"
+json.dump(d, open(p, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+print("  package.json main ->", d["main"])
+P
+  echo "  NapCat 注入已修复（ESM 兼容）"
 else
   rm -rf /tmp/napcatx && mkdir -p /tmp/napcatx
   unzip -o -q /root/.arkdroid/napcat.zip -d /tmp/napcatx
@@ -496,13 +515,14 @@ else
   if [ -f /tmp/napcatx/loadNapCat.js ]; then SRC=/tmp/napcatx;
   else SRC=$(find /tmp/napcatx -name loadNapCat.js 2>/dev/null | head -1 | xargs -r dirname); fi
   [ -n "$SRC" ] || { echo "ZIP 里没有 loadNapCat.js，确认是 NapCat.Shell.zip"; exit 5; }
-  mkdir -p "$APPDIR/app_launcher/napcat"
-  cp -a "$SRC"/. "$APPDIR/app_launcher/napcat/"
+  mkdir -p "$NAPCAT_DIR"
+  cp -a "$SRC"/. "$NAPCAT_DIR/"
+  fix_loader
   python3 - "$APPDIR/package.json" <<'"'"'P'"'"'
 import json, sys
 p = sys.argv[1]
 d = json.load(open(p, encoding="utf-8"))
-d["main"] = "./app_launcher/napcat/loadNapCat.js"
+d["main"] = "./app_launcher/napcat/loadNapCat.cjs"
 json.dump(d, open(p, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
 print("  package.json main ->", d["main"])
 P
@@ -512,7 +532,7 @@ fi
   else
     warn "没有 napcat.zip：QQ 装好了但没注入 NapCat，拿到包后重跑本脚本"
   fi
-  ok "本机 QQ 就绪（WebUI 6099，登录后 Milky 用 3000）"
+  ok "本机 QQ 就绪（WebUI 6099，OneBot 直连 3001）"
 fi
 
 # ------------------------------------------------------------------ 8/9 ArkLink
@@ -564,17 +584,16 @@ cat <<'EOT'
 
 装完了。完整链路（一台手机，全程 127.0.0.1）：
 
-  QQ arm64 → NapCat(Milky 3000) → ArkLink(OneBot 6700) → ArkBridge → AstrBot(6199)
+  QQ arm64 → NapCat(OneBot WS 3001) → ArkBridge → AstrBot(6185)
 
-按顺序：
+傻瓜式用法（App 会自动做，手敲才需要看这里）：
 
-  qq start        # 起 QQ（Xvfb 无头），首次登录在 http://127.0.0.1:6099/webui 扫码
-                  # 登录后在 WebUI「网络配置」新建 Milky 服务器：127.0.0.1:3000
-  arklink start   # 起 ArkLink，把 Milky 翻译成 OneBot 11（6700）
-  astr start      # 起 AstrBot
-  然后在 ArkDroid 里把中继地址填 ws://127.0.0.1:6700/onebot/v11/ws，点「保存并重启中继」
+  astr start      # 起 AstrBot，面板 http://127.0.0.1:6185
+  qq start        # 起 QQ（Xvfb 无头），首次在 http://127.0.0.1:6099/webui 扫码登录
+                  # 登录后 OneBot 3001 自动就绪（配置已预置，不用进 WebUI 配网络）
+  然后 ArkDroid 的中继地址保持 ws://127.0.0.1:3001 直连即可（App 已自动填好）
 
-排障：qq log / arklink log / astr log；状态：qq status / arklink status / astr status
+排障：qq log / astr log；状态：qq status / astr status
 EOT
 
 # 让 uploader 把最后几行排空再退出（它是要往回环 POST 的，别截断）
