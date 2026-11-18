@@ -369,6 +369,25 @@ EOS
 chmod +x "$STATE/proot-run.sh"
 ok "Ubuntu 入口写好：$STATE/proot-run.sh（命令交给 App 起平级 proot 执行）"
 
+# ------------------------------------------------------------------ 2.5/9 dpkg 自愈
+# rootfs 里 debconf 缺失时，tzdata/ca-certificates 等包的 postinst 会 exec
+# /usr/share/debconf/frontend 直接 127，十来个包卡在半配置状态，后面 apt 全挂。
+# 先单独把 debconf 装上（download + dpkg -i，不碰半配置包），再统一 configure -a。
+step "2.5/9 dpkg 半配置自愈"
+"$STATE/proot-run.sh" /bin/bash -c '
+export DEBIAN_FRONTEND=noninteractive
+if [ ! -f /usr/share/debconf/confmodule ]; then
+  echo "  缺 debconf（postinst 会崩），先单独补装"
+  apt-get update -qq || true
+  (cd /tmp && apt-get download debconf >/dev/null 2>&1 \
+     && dpkg -i /tmp/debconf_*.deb >/dev/null 2>&1) \
+     || apt-get install -y debconf || true
+  rm -f /tmp/debconf_*.deb
+fi
+dpkg --configure -a || echo "  dpkg --configure -a 仍有报错，交给后续 apt 再试"
+'
+ok "dpkg 状态自检完成"
+
 # ------------------------------------------------------------------ 3-6/9 AstrBot
 if [ "$SKIP_ASTR" = "0" ]; then
   step "3/9 Ubuntu 里的 Python"
