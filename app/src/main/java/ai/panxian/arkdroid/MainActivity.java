@@ -644,7 +644,7 @@ public class MainActivity extends AppCompatActivity {
         final Catalog.Item apk = Catalog.find(this, "termux");
         final boolean apkReady = apk != null && apk.ready(this);
         String message;
-        int posTitle;
+        String posTitle;
         if (isArk) {
             // ArkTerm 已装：授权内置，什么都不用配
             message = "ArkTerm 已装好，外部应用授权是内置的，\n"
