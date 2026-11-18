@@ -386,6 +386,14 @@ if [ ! -x /usr/share/debconf/frontend ] || ! dpkg-query -W -f="${Status}" debcon
     || echo "  在线补装没成功"
   rm -f /tmp/debconf_*.deb
 fi
+# 关键：/usr/share/debconf/frontend 和 dpkg-preconfigure 都是 perl 脚本，
+# 这个精简 rootfs 没有 perl —— 文件在但 exec 报 not found（解释器缺失）
+if ! command -v perl >/dev/null 2>&1; then
+  echo "  缺 perl-base（frontend/dpkg-preconfigure 是 perl 脚本），补装"
+  (cd /tmp && timeout 180 apt-get download perl-base && dpkg -i /tmp/perl-base_*.deb) \
+    || echo "  perl-base 补装没成功"
+  rm -f /tmp/perl-base_*.deb
+fi
 if [ ! -x /usr/share/debconf/frontend ]; then
   echo "  用空 frontend 兜底（跳过交互提问，用默认值）"
   mkdir -p /usr/share/debconf
