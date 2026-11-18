@@ -123,6 +123,7 @@ public class MainActivity extends AppCompatActivity {
         wire();
         showVersion();
         askNotificationPermission();
+        askRunCommandPermission();
 
         bg.execute(() -> {
             try {
@@ -277,8 +278,7 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.btnTermClear).setOnClickListener(v -> Term.clear());
 
         findViewById(R.id.btnQqInstall).setOnClickListener(v -> {
-            if (!Termux.installed(this)) {
-                showTermuxHelp();
+            if (!readyToSend()) {
                 return;
             }
             jumpTo(cardQq);
@@ -288,8 +288,7 @@ public class MainActivity extends AppCompatActivity {
             ui.postDelayed(() -> NapCat.seedOneBotConfig(this), 5000);
         });
         findViewById(R.id.btnQqStart).setOnClickListener(v -> {
-            if (!Termux.installed(this)) {
-                showTermuxHelp();
+            if (!readyToSend()) {
                 return;
             }
             jumpTo(cardQq);
@@ -351,7 +350,7 @@ public class MainActivity extends AppCompatActivity {
 
         if (!Termux.installed(this)) {
             txtAstrState.setText("没装 Termux。AstrBot 依赖的是 glibc 轮子，Android 原生装不上，"
-                    + "要跑它得先装 Termux（F-Droid 版），再回来点「安装 / 更新」。");
+                    + "要跑它得先装下载卡里的 ArkTerm，再回来点「安装 / 更新」。");
             txtAstrState.setTextColor(getColor(R.color.warn));
         } else if (astrUp) {
             txtAstrState.setText("面板在线 · " + PANEL_URL);
@@ -443,6 +442,11 @@ public class MainActivity extends AppCompatActivity {
             showTermuxHelp();
             return;
         }
+        if (!hasRunCommandPermission()) {
+            requestPermissions(new String[]{PERM_RUN_COMMAND}, 9);
+            toast("Termux 刚装好或重装过，允许弹出的「RUN_COMMAND」权限后，再点一次");
+            return;
+        }
         boolean allReady = Downloads.allReady(this);
         String extra = allReady
                 ? "要用的三个包都已经下好，走本机回环递给 Termux，不再走流量。\n\n"
@@ -479,8 +483,7 @@ public class MainActivity extends AppCompatActivity {
         if (command == null || command.trim().isEmpty()) {
             return;
         }
-        if (!Termux.installed(this)) {
-            showTermuxHelp();
+        if (!readyToSend()) {
             return;
         }
         inpCmd.setText("");
@@ -491,9 +494,22 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void sendCommandAsync(String command) {
+    /** 发命令前统一检查：Termux 在不在 + RUN_COMMAND 权限还在不在（重装 Termux 会被撤销）。 */
+    private boolean readyToSend() {
         if (!Termux.installed(this)) {
             showTermuxHelp();
+            return false;
+        }
+        if (!hasRunCommandPermission()) {
+            requestPermissions(new String[]{PERM_RUN_COMMAND}, 9);
+            toast("Termux 刚装好或重装过，系统把授权撤了——允许弹出的「RUN_COMMAND」权限后，再点一次");
+            return false;
+        }
+        return true;
+    }
+
+    private void sendCommandAsync(String command) {
+        if (!readyToSend()) {
             return;
         }
         BridgeService.serve(this);
@@ -513,8 +529,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void readCreds() {
-        if (!Termux.installed(this)) {
-            showTermuxHelp();
+        if (!readyToSend()) {
             return;
         }
         Creds.reset();
@@ -531,8 +546,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void askResetPassword() {
-        if (!Termux.installed(this)) {
-            showTermuxHelp();
+        if (!readyToSend()) {
             return;
         }
         final TextInputEditText input = new TextInputEditText(this);
@@ -558,8 +572,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void sendToTermux(String command) {
-        if (!Termux.installed(this)) {
-            showTermuxHelp();
+        if (!readyToSend()) {
             return;
         }
         boolean ok = Termux.run(this, command, true);
@@ -695,6 +708,23 @@ public class MainActivity extends AppCompatActivity {
                 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
                 != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 7);
+        }
+    }
+
+    /**
+     * Termux 的 RUN_COMMAND 是危险权限：卸载重装 Termux 后，本 App 拿到的授权会被系统
+     * 静默撤销（日志表现为 SecurityException "without permission
+     * com.termux.permission.RUN_COMMAND"）。所以启动时和每次发命令前都查一遍，缺就弹窗。
+     */
+    static final String PERM_RUN_COMMAND = "com.termux.permission.RUN_COMMAND";
+
+    private boolean hasRunCommandPermission() {
+        return checkSelfPermission(PERM_RUN_COMMAND) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void askRunCommandPermission() {
+        if (Termux.installed(this) && !hasRunCommandPermission()) {
+            requestPermissions(new String[]{PERM_RUN_COMMAND}, 9);
         }
     }
 
