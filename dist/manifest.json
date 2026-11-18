@@ -5,16 +5,16 @@
   "components": [
     {
       "id": "termux",
-      "title": "Termux",
-      "desc": "AstrBot 的运行环境（arm64）",
-      "file": "termux.apk",
+      "title": "ArkTerm（内置版 Termux）",
+      "desc": "已内置 allow-external-apps 授权，装上即用，零配置；如装过官方 Termux 请先卸载",
+      "file": "arkterm.apk",
       "kind": "apk",
-      "size": 35106607,
-      "sha256": "72fdb596045116bf5ba1b5bdf5b26fddb9acc0bd074ad9f2da9eb0ae85e83a4e",
+      "size": 34589623,
+      "sha256": "ea6c0e73eaa659ed146c1eb36e9ea90cada3579e16d883d076276c93e8148595",
       "mirrors": [
-        "https://ghfast.top/https://github.com/termux/termux-app/releases/download/v0.118.3/termux-app_v0.118.3%2Bgithub-debug_arm64-v8a.apk",
-        "https://gh-proxy.com/https://github.com/termux/termux-app/releases/download/v0.118.3/termux-app_v0.118.3%2Bgithub-debug_arm64-v8a.apk",
-        "https://github.com/termux/termux-app/releases/download/v0.118.3/termux-app_v0.118.3%2Bgithub-debug_arm64-v8a.apk"
+        "https://github.com/panxian-AI/ArkDroid/releases/download/arkterm-0.118.3/ArkTerm-0.118.3-arm64.apk",
+        "https://gh-proxy.com/https://github.com/panxian-AI/ArkDroid/releases/download/arkterm-0.118.3/ArkTerm-0.118.3-arm64.apk",
+        "https://ghfast.top/https://github.com/panxian-AI/ArkDroid/releases/download/arkterm-0.118.3/ArkTerm-0.118.3-arm64.apk"
       ]
     },
     {

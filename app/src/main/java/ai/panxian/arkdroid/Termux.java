@@ -13,7 +13,9 @@ import java.io.IOException;
 /**
  * 和 Termux 打交道：发命令，并把输出捞回 App 的终端窗口。
  *
- * <p>前提是 Termux 里开了 {@code allow-external-apps=true}（~/.termux/termux.properties）。
+ * <p>推荐用户装的是 ArkTerm（我们重打包的 Termux，{@code versionName} 带 {@code -ark} 后缀），
+ * {@code allow-external-apps} 授权已内置，装上即用。官方 Termux 也能用，
+ * 但得手动在 {@code ~/.termux/termux.properties} 里加 {@code allow-external-apps=true}。
  *
  * <p>输出怎么回来：Termux 执行 {@code ( 命令 ) 2>&1 | curl -X POST ... $ARKDROID_LOCAL/p/term}，
  * 也就是把 stdout/stderr 直接 POST 到 App 起的回环服务上。curl 从管道读时用 chunked，
@@ -31,6 +33,16 @@ final class Termux {
     static boolean installed(Context ctx) {
         try {
             return ctx.getPackageManager().getPackageInfo(PKG, 0) != null;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /** 装的是不是我们的 ArkTerm（versionName 以 -ark 结尾，授权内置）。 */
+    static boolean isArkTerm(Context ctx) {
+        try {
+            String v = ctx.getPackageManager().getPackageInfo(PKG, 0).versionName;
+            return v != null && v.endsWith("-ark");
         } catch (Exception e) {
             return false;
         }
@@ -132,7 +144,8 @@ final class Termux {
         } catch (Exception e) {
             Log.w("ArkDroid", "run command failed", e);
             LogBus.append("发送 Termux 命令失败：" + e.getMessage()
-                    + "（Termux 里得开 allow-external-apps）");
+                    + "（装官方 Termux 的话需要开 allow-external-apps，"
+                    + "或者卸掉改装 App 下载卡里的 ArkTerm）");
             return false;
         }
     }

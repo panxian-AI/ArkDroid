@@ -487,7 +487,7 @@ public class MainActivity extends AppCompatActivity {
         Term.note("$ " + command);
         BridgeService.serve(this);
         if (!Termux.send(this, command, 900)) {
-            toast("发不出去，检查 Termux 的 allow-external-apps");
+            toastSendFail();
         }
     }
 
@@ -498,7 +498,17 @@ public class MainActivity extends AppCompatActivity {
         }
         BridgeService.serve(this);
         if (!Termux.astr(this, command.replaceFirst("^astr ", ""))) {
-            toast("发不出去，检查 Termux 的 allow-external-apps");
+            toastSendFail();
+        }
+    }
+
+    /** 发命令失败的统一提示：装官方 Termux 的引导去换 ArkTerm。 */
+    private void toastSendFail() {
+        if (Termux.installed(this) && !Termux.isArkTerm(this)) {
+            toast("命令没发出去。装的是官方 Termux（默认拒外部命令），"
+                    + "点 Termux 卡的「帮助」按引导换 ArkTerm");
+        } else {
+            toast("命令没发出去，ArkTerm 可能还没启动过一次，先打开它再回这里");
         }
     }
 
@@ -553,7 +563,7 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         boolean ok = Termux.run(this, command, true);
-        toast(ok ? "已发给 Termux：" + command : "发送失败，Termux 可能没开 allow-external-apps");
+        toast(ok ? "已发给 Termux：" + command : "发送失败，看看 Termux 卡里的帮助说明");
     }
 
     private void openPanel() {
@@ -630,43 +640,53 @@ public class MainActivity extends AppCompatActivity {
 
     private void showTermuxHelp() {
         boolean hasTermux = Termux.installed(this);
+        boolean isArk = Termux.isArkTerm(this);
         final Catalog.Item apk = Catalog.find(this, "termux");
         final boolean apkReady = apk != null && apk.ready(this);
-        String message = hasTermux
-                ? "Termux 有了，但还差一步授权：\n\n"
-                + "在 Termux 里执行一次（只需一次）：\n"
-                + "   echo \"allow-external-apps=true\" >> ~/.termux/termux.properties\n\n"
-                + "然后回到这里点「安装 / 更新」。"
-                : "AstrBot 的依赖（faiss / pandas / watchfiles 等）只有 glibc 轮子，"
-                + "Android 原生环境装不上，官方也是 Termux + proot Ubuntu 这条路。\n\n"
-                + (apkReady
-                ? "Termux 的安装包已经下好了，点下面直接装。"
-                : "点「下载 Termux」，App 会自己挑最快的镜像下好再拉起安装器，不用去浏览器。");
+        String message;
+        int posTitle;
+        if (isArk) {
+            // ArkTerm 已装：授权内置，什么都不用配
+            message = "ArkTerm 已装好，外部应用授权是内置的，\n"
+                    + "什么都不用配，直接点「安装 / 更新」或发命令就行。";
+            posTitle = "打开 ArkTerm";
+        } else if (hasTermux) {
+            // 官方 Termux：最省事的路线是卸掉换 ArkTerm
+            message = "检测到装的是官方 Termux，它默认不允许外部应用发命令，"
+                    + "所以所有命令都会被拒（allow-external-apps 没开）。\n\n"
+                    + "最省事的做法：卸载官方 Termux，然后从 App 的「下载」卡装 ArkTerm"
+                    + "（我们重打包的 Termux，授权已内置，装上即用零配置）。\n\n"
+                    + "或者保留官方 Termux，在它里面执行一次：\n"
+                    + "   echo \"allow-external-apps=true\" >> ~/.termux/termux.properties\n"
+                    + "然后点 Termux 设置里的 reload（或重启 Termux）。";
+            posTitle = apkReady ? "装 ArkTerm" : "下载 ArkTerm";
+        } else {
+            // 什么都没装：直接引导装 ArkTerm
+            message = "AstrBot 的依赖（faiss / pandas / watchfiles 等）只有 glibc 轮子，"
+                    + "Android 原生环境装不上，官方也是 Termux + proot Ubuntu 这条路。\n\n"
+                    + "推荐装 ArkTerm：我们重打包的 Termux，外部应用授权已内置，"
+                    + "装上即用，不用敲任何配置命令。\n\n"
+                    + (apkReady
+                    ? "ArkTerm 的安装包已经下好了，点下面直接装。"
+                    : "点下面的按钮，App 会自己挑最快的镜像下好再拉起安装器，不用去浏览器。");
+            posTitle = apkReady ? "开始安装" : "下载 ArkTerm";
+        }
         new AlertDialog.Builder(this)
-                .setTitle(hasTermux ? "Termux 还需要授权" : "需要 Termux")
+                .setTitle(isArk ? "ArkTerm 已就绪" : (hasTermux ? "官方 Termux 缺授权" : "装 ArkTerm（内置版 Termux）"))
                 .setMessage(message)
                 .setNegativeButton("知道了", null)
-                .setPositiveButton(hasTermux ? "打开 Termux" : (apkReady ? "开始安装" : "下载 Termux"),
-                        (dialog, which) -> {
-                            if (hasTermux) {
-                                Termux.launch(this);
-                                return;
-                            }
-                            if (apkReady) {
-                                Termux.installApk(this, apk.target(this));
-                            } else {
-                                startDownload(java.util.Collections.singletonList("termux"));
-                            }
-                        })
-                .setNeutralButton("复制配置命令", (dialog, which) -> {
-                    ClipboardManager cm =
-                            (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-                    if (cm != null) {
-                        cm.setPrimaryClip(ClipData.newPlainText("termux",
-                                "echo \"allow-external-apps=true\" >> ~/.termux/termux.properties"));
-                        toast("已复制，粘到 Termux 里执行");
+                .setPositiveButton(posTitle, (dialog, which) -> {
+                    if (isArk) {
+                        Termux.launch(this);
+                        return;
+                    }
+                    if (apkReady) {
+                        Termux.installApk(this, apk.target(this));
+                    } else {
+                        startDownload(java.util.Collections.singletonList("termux"));
                     }
                 })
+                .setNeutralButton("打开 Termux", (dialog, which) -> Termux.launch(this))
                 .show();
     }
 

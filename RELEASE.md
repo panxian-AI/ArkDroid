@@ -55,7 +55,7 @@ QQ arm64(proot, Xvfb 无头) → NapCat(Milky 3000) → ArkLink(OneBot 6700) →
 ## 已知限制（说清楚，不粉饰）
 
 - **命令输出是跑完才回来**：Termux 的 `RUN_COMMAND` 没有真正的流式管道，ArkDroid 是把输出落文件再回传，所以长命令要等结束才看到结果。
-- Termux 必须允许外部调用（`allow-external-apps=true`），ArkDroid 会引导你改。
+- Termux 需要允许外部调用。推荐直接用 App 下载卡里的 **ArkTerm**（重打包的 Termux，`allow-external-apps` 已内置，装上即用）；用官方 Termux 的话要手动改 `termux.properties`。
 - proot 有性能损耗，AstrBot 启动比在服务器上慢一点；QQ 无头是 Electron，**内存建议 6 GB 以上的手机**。
 - NapCat 首次登录要扫码（在 WebUI 里），Milky 服务器要在 WebUI 手动新建一次。
 - 只支持 `arm64-v8a` 和 `x86_64`（Chaquopy 的 CPython 3.13 没有 32 位轮子）。
