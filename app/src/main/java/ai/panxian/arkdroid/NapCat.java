@@ -36,6 +36,9 @@ final class NapCat {
     static final String ARKLINK_URL = "ws://127.0.0.1:" + ARKLINK_PORT + "/onebot/v11/ws";
     static final String ONEBOT_URL = "ws://127.0.0.1:" + ONEBOT_PORT;
 
+    /** NapCat WebUI 登录密钥——固定值，由我们写进 webui.json 并显示在卡片里，不用翻日志。 */
+    static final String WEBUI_TOKEN = "arkdroid";
+
     /** 最近一次探测结果。 */
     static volatile boolean webuiUp;
     static volatile boolean arklinkUp;
@@ -158,7 +161,24 @@ final class NapCat {
                 + "  \"parseMultMsg\": false\n"
                 + "}\n"
                 + "JSON\n"
-                + "echo \"已写入 OneBot 配置（备用直连 3001）：$F\"; fi; done";
+                + "echo \"已写入 OneBot 配置（备用直连 3001）：$F\"; "
+                // WebUI 登录密钥固定成 arkdroid，免得 NapCat 随机生成一个让人翻日志
+                + "W=\"$d/webui.json\"; "
+                + "if [ ! -f \"$W\" ] || ! grep -q '\"token\" *: *\"arkdroid\"' \"$W\"; then "
+                + "cat > \"$W\" <<'WJSON'\n"
+                + "{\n"
+                + "  \"host\": \"0.0.0.0\",\n"
+                + "  \"port\": " + WEBUI_PORT + ",\n"
+                + "  \"prefix\": \"\",\n"
+                + "  \"token\": \"" + WEBUI_TOKEN + "\",\n"
+                + "  \"loginRate\": 3,\n"
+                + "  \"autoLoginAccount\": \"\"\n"
+                + "}\n"
+                + "WJSON\n"
+                + "echo \"WebUI 登录密钥已固定：" + WEBUI_TOKEN + "（在 App 卡片里可见）\"; "
+                + "pgrep -f /opt/QQ/qq >/dev/null 2>&1 && { echo \"QQ 在跑，重启让新密钥生效…\"; ~/.arkdroid/qq restart; }; "
+                + "fi; "
+                + "fi; done";
         Termux.send(ctx, cmd, 120);
     }
 }

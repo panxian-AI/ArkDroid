@@ -71,7 +71,7 @@ exec /opt/QQ/qq --no-sandbox \
   --disable-gpu-compositing \
   --disable-dev-shm-usage
   '
-  echo "已启动（pid $(cat "$PID" 2>/dev/null)）。首次登录：浏览器开 http://127.0.0.1:6099/webui 扫码"
+  echo "已启动（pid $(cat "$PID" 2>/dev/null)）。首次登录：浏览器开 http://127.0.0.1:6099/webui，密钥 arkdroid"
   # 等最多 20 秒，真验证 NapCat 起没起来，别拿 pid 糊弄人
   ok=0
   for i in $(seq 1 20); do
@@ -106,7 +106,7 @@ case "${1:-status}" in
   status)
     running && echo "进程在跑（pid $(pid_of)）" || echo "进程没在跑"
     if webui_ok; then
-      echo "NapCat WebUI 127.0.0.1:6099 ✓ 在线"
+      echo "NapCat WebUI 127.0.0.1:6099 ✓ 在线（登录密钥 arkdroid）"
       curl -s -o /dev/null -m 2 http://127.0.0.1:3001/ 2>/dev/null \
         && echo "OneBot WS 127.0.0.1:3001 ✓（中继直连这个）" \
         || echo "OneBot WS 127.0.0.1:3001 △ 未确认（WS 端口不一定响应 HTTP）"

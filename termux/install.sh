@@ -528,6 +528,22 @@ print("  package.json main ->", d["main"])
 P
   echo "  NapCat 注入完成"
 fi
+# WebUI 登录密钥固定成 arkdroid（免翻启动日志找随机 token）
+NAPCFG="$NAPCAT_DIR/config"
+mkdir -p "$NAPCFG"
+if [ ! -f "$NAPCFG/webui.json" ] || ! grep -q '"token" *: *"arkdroid"' "$NAPCFG/webui.json"; then
+  cat > "$NAPCFG/webui.json" <<'"'"'WJSON'"'"'
+{
+  "host": "0.0.0.0",
+  "port": 6099,
+  "prefix": "",
+  "token": "arkdroid",
+  "loginRate": 3,
+  "autoLoginAccount": ""
+}
+WJSON
+  echo "  WebUI 登录密钥已固定：arkdroid"
+fi
     ' || die "NapCat 注入失败（确认 napcat.zip 是 NapCat.Shell.zip）"
   else
     warn "没有 napcat.zip：QQ 装好了但没注入 NapCat，拿到包后重跑本脚本"
@@ -589,7 +605,7 @@ cat <<'EOT'
 傻瓜式用法（App 会自动做，手敲才需要看这里）：
 
   astr start      # 起 AstrBot，面板 http://127.0.0.1:6185
-  qq start        # 起 QQ（Xvfb 无头），首次在 http://127.0.0.1:6099/webui 扫码登录
+  qq start        # 起 QQ（Xvfb 无头），首次在 http://127.0.0.1:6099/webui 扫码登录（密钥 arkdroid）
                   # 登录后 OneBot 3001 自动就绪（配置已预置，不用进 WebUI 配网络）
   然后 ArkDroid 的中继地址保持 ws://127.0.0.1:3001 直连即可（App 已自动填好）
 

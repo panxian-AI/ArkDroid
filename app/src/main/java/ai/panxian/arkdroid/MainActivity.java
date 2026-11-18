@@ -796,18 +796,22 @@ public class MainActivity extends AppCompatActivity {
             bg.execute(NapCat::probe);
         }
         if (NapCat.onebotUp && NapCat.webuiUp) {
-            tv.setText("链路在线：NapCat WebUI 6099 + OneBot 直连 3001（中继连它，不用再配 Milky）");
+            tv.setText("链路在线：NapCat WebUI 6099 + OneBot 直连 3001（中继连它，不用再配 Milky）\n"
+                    + "WebUI 登录密钥：" + NapCat.WEBUI_TOKEN);
             tv.setTextColor(getColor(R.color.ok));
         } else if (NapCat.onebotUp) {
-            tv.setText("OneBot 3001 在线（中继直连它），WebUI 6099 没响应——qq log 看日志");
+            tv.setText("OneBot 3001 在线（中继直连它），WebUI 6099 没响应——qq log 看日志\n"
+                    + "WebUI 登录密钥：" + NapCat.WEBUI_TOKEN);
             tv.setTextColor(getColor(R.color.warn));
         } else if (NapCat.webuiUp) {
-            tv.setText("NapCat 在线（WebUI 6099），OneBot 3001 未确认——「启动」会自动把中继地址填成直连");
+            tv.setText("NapCat 在线（WebUI 6099），OneBot 3001 未确认——「启动」会自动把中继地址填成直连\n"
+                    + "WebUI 登录密钥：" + NapCat.WEBUI_TOKEN);
             tv.setTextColor(getColor(R.color.warn));
         } else {
             tv.setText("没响应。第一次：点「装 NapCat」（一并装 QQ）→ 点「启动」（自动补运行库 + 起服务）\n"
                     + "→ 在 WebUI 6099 里扫码登录 QQ（登录后 OneBot 3001 自动就绪）\n"
-                    + "→ 点「填本机地址」，中继直连 ws://127.0.0.1:3001（不用配 Milky）");
+                    + "→ 点「填本机地址」，中继直连 ws://127.0.0.1:3001（不用配 Milky）\n"
+                    + "WebUI 登录密钥：" + NapCat.WEBUI_TOKEN);
             tv.setTextColor(getColor(R.color.muted));
         }
     }
