@@ -19,6 +19,8 @@ final class Creds {
     static volatile String pass = "";
     static volatile boolean hashed;
     static volatile boolean firstRun;
+    static volatile boolean known;   // App 记录的密码验证过是当前密码
+    static volatile boolean chgRequired; // 面板要求登录后再改一次密码
     static volatile boolean present;
     static volatile long updatedAt;
 
@@ -45,6 +47,12 @@ final class Creds {
                 case "HASHED":
                     hashed = "1".equals(value) || "true".equalsIgnoreCase(value);
                     break;
+                case "KNOWN":
+                    known = "1".equals(value) || "true".equalsIgnoreCase(value);
+                    break;
+                case "CHG":
+                    chgRequired = "1".equals(value) || "true".equalsIgnoreCase(value);
+                    break;
                 case "FIRST_RUN":
                     firstRun = "1".equals(value) || "true".equalsIgnoreCase(value);
                     break;
@@ -65,6 +73,8 @@ final class Creds {
         pass = "";
         hashed = false;
         firstRun = false;
+        known = false;
+        chgRequired = false;
         present = false;
         fire();
     }
@@ -81,10 +91,16 @@ final class Creds {
         sb.append("账号 ").append(user.isEmpty() ? "astrbot" : user);
         if (!pass.isEmpty()) {
             sb.append(" · 密码 ").append(pass);
+            sb.append(known ? "（App 记录，验证可用）" : "");
+            if (chgRequired) {
+                sb.append("\n面板会要求登录后再改一次密码——改完这里就看不到新密码了，"
+                        + "忘了随时点「重置面板密码」");
+            }
         } else if (firstRun) {
             sb.append(" · 密码还没设过：第一次打开面板会让你设一个");
         } else if (hashed) {
-            sb.append(" · 密码已加密保存（看不回明文，忘了就点「重置密码」）");
+            sb.append("\n密码已加密保存（看不回明文）。忘了就点「重置面板密码」："
+                    + "会生成一个新密码并显示在这里，用它能直接登录");
         } else {
             sb.append(" · 密码为空");
         }

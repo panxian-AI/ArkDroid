@@ -77,14 +77,39 @@ case "${1:-status}" in
   status) status ;;
   log) tail -n "${2:-80}" "$LOG" 2>/dev/null || echo "还没日志" ;;
   creds) "$STATE/proot-run.sh" /usr/bin/python3 /root/.arkdroid/creds.py ;;
-  resetpw)
+  setpw|resetpw)
     pw="${2:-}"
-    [ -n "$pw" ] || { echo "用法: astr resetpw 新密码"; exit 2; }
-    stop
-    echo "用新密码重启一次，AstrBot 会把新密码写进配置…"
-    ARK_ENV="ASTRBOT_RESET_DASHBOARD_PASSWORD=$pw" start
-    sleep 6
-    echo "完成。账号 astrbot / 密码 $pw"
+    if [ -z "$pw" ]; then
+      # 自动生成：固定前缀保证一定满足 AstrBot 的复杂度要求（大写+小写+数字）
+      pw="Arkb0t-$(tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 6)"
+    fi
+    case "$pw" in
+      *[A-Z]*) : ;; *) echo "✗ 密码要含大写字母"; exit 2 ;;
+    esac
+    case "$pw" in
+      *[a-z]*) : ;; *) echo "✗ 密码要含小写字母"; exit 2 ;;
+    esac
+    case "$pw" in
+      *[0-9]*) : ;; *) echo "✗ 密码要含数字"; exit 2 ;;
+    esac
+    if [ "${#pw}" -lt 8 ]; then echo "✗ 至少 8 位"; exit 2; fi
+    was_running=0; running && was_running=1
+    stop >/dev/null 2>&1
+    echo "改写面板配置（pbkdf2 计算要几秒）…"
+    out=$("$STATE/proot-run.sh" /usr/bin/python3 /root/.arkdroid/setpw.py "$pw")
+    case "$out" in
+      OK=1*)
+        echo "$out"
+        echo "$pw" > "$STATE/panel.pw"; chmod 600 "$STATE/panel.pw" 2>/dev/null
+        [ "$was_running" = 1 ] && start
+        echo "✓ 面板密码已重置（App 的「账号密码」卡也会显示）"
+        ;;
+      *)
+        echo "$out"; echo "✗ 改配置失败"
+        [ "$was_running" = 1 ] && start
+        exit 1
+        ;;
+    esac
     ;;
   shell) echo "交互 shell 不可用（App 不是终端）。用：astr run '命令'，例如 astr run 'ls /root'" ;;
   run) shift; "$STATE/proot-run.sh" /bin/bash -c "$*" ;;

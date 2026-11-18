@@ -701,23 +701,33 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         final TextInputEditText input = new TextInputEditText(this);
-        input.setHint("新的面板密码（至少 8 位）");
+        input.setHint("新密码（大写+小写+数字，≥8 位；留空自动生成）");
         int pad = (int) (16 * getResources().getDisplayMetrics().density);
         input.setPadding(pad, pad, pad, pad);
         new AlertDialog.Builder(this)
                 .setTitle("重置 AstrBot 面板密码")
-                .setMessage("AstrBot 支持用环境变量重置：会用新密码重启一次，然后写进配置。")
+                .setMessage("直接改 AstrBot 的配置文件（会先停掉 AstrBot，改完自动重启）。\n\n"
+                        + "新密码会显示在上面的「账号密码」卡里，照着输就能登录面板。")
                 .setView(input)
                 .setNegativeButton("取消", null)
                 .setPositiveButton("重置", (dialog, which) -> {
                     String pw = value(input);
-                    if (pw.length() < 8) {
-                        toast("太短了，至少 8 位");
-                        return;
+                    if (!pw.isEmpty()) {
+                        if (pw.length() < 8) {
+                            toast("太短了，至少 8 位");
+                            return;
+                        }
+                        if (!pw.matches(".*[A-Z].*") || !pw.matches(".*[a-z].*")
+                                || !pw.matches(".*[0-9].*")) {
+                            toast("要同时含大写字母、小写字母和数字");
+                            return;
+                        }
                     }
                     Term.note("=== 重置面板密码 ===");
                     BridgeService.serve(this);
                     Termux.resetPassword(this, pw);
+                    // resetpw 要停进程 + 改配置 + 重启，等它跑完再自动读一次账号
+                    ui.postDelayed(this::readCreds, 25_000);
                 })
                 .show();
     }

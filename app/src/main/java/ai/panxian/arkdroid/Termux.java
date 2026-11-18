@@ -53,7 +53,7 @@ final class Termux {
             String scripts = ""
                     // 六个 Termux 侧脚本全部从 assets 端点拿（bootstrap 自带 curl 或用 arknet 兜底）
                     + " mkdir -p \"$HOME/.arkdroid\"; all=1"
-                    + "; for f in arknet.sh install.sh astr qq arklink creds.py; do"
+                    + "; for f in arknet.sh install.sh astr qq arklink creds.py setpw.py; do"
                     + " if command -v curl >/dev/null 2>&1; then"
                     + " curl -fsSL -m 60 -o \"$HOME/.arkdroid/$f\" \"$ARKDROID_LOCAL/a/termux/$f\""
                     + "; else bash \"$HOME/.arkdroid/arknet.sh\" GET \"$ARKDROID_LOCAL/a/termux/$f\""

@@ -448,6 +448,15 @@ set -e
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y --no-install-recommends unzip xvfb dbus dbus-x11 fonts-noto-cjk procps
+# QQ（Electron）运行要的库。libasound 在 noble 里叫 libasound2t64，老名 libasound2 兜底；
+# 其余几个哪怕 apt 名字对不上也不让它拦住安装（QQ deb 自己的依赖多半已带上）
+for p in libasound2t64 libasound2; do
+  apt-get install -y --no-install-recommends "$p" >/dev/null 2>&1 && { echo "  $p 就绪"; break; }
+done
+apt-get install -y --no-install-recommends \
+  libnss3 libatk-bridge2.0-0t64 libatk1.0-0t64 libcups2t64 libdrm2 libgbm1 \
+  libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libatspi2.0-0t64 \
+  >/dev/null 2>&1 || true
 echo "  Xvfb / dbus / 中文字体就绪"
 if [ -x /opt/QQ/qq ]; then
   echo "  QQ 已装，跳过 deb"
