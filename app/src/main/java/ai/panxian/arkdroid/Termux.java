@@ -56,6 +56,28 @@ final class Termux {
         }
     }
 
+    // ----------------------------------------------------- 首次启动引导标记
+
+    /**
+     * 刚装好的 ArkTerm（从未启动过）处于 stopped state，系统会拒绝其他 App 给它发命令；
+     * 而且第一次启动要跑 bootstrap（装 bash/curl 等基础命令），install.sh 全靠它们。
+     * 所以装完 APK 后记个标记，引导用户先打开一次 ArkTerm。
+     */
+    static void markNeedsFirstLaunch(Context ctx) {
+        ctx.getSharedPreferences("arkdroid", Context.MODE_PRIVATE)
+                .edit().putBoolean("arkterm_needs_first_launch", true).apply();
+    }
+
+    static void markLaunched(Context ctx) {
+        ctx.getSharedPreferences("arkdroid", Context.MODE_PRIVATE)
+                .edit().putBoolean("arkterm_needs_first_launch", false).apply();
+    }
+
+    static boolean needsFirstLaunch(Context ctx) {
+        return ctx.getSharedPreferences("arkdroid", Context.MODE_PRIVATE)
+                .getBoolean("arkterm_needs_first_launch", false);
+    }
+
     // ------------------------------------------------------------------ 通道
 
     /** 前缀：把本地服务地址塞进环境变量，后面所有命令都靠它回传输出。 */
@@ -141,11 +163,21 @@ final class Termux {
             // 0 = 切到该 session，装东西时用户能直接看见进度
             intent.putExtra("com.termux.RUN_COMMAND_SESSION_ACTION", background ? "1" : "0");
             ctx.startService(intent);
+            markLaunched(ctx); // 命令能发出去 = bootstrap 已跑过，首启引导到此为止
             return true;
         } catch (Exception e) {
             Log.w("ArkDroid", "run command failed", e);
-            LogBus.append("发送 Termux 命令失败：" + e.getMessage()
-                    + "（缺 com.termux.permission.RUN_COMMAND 授权的话，回到 App 等它弹权限框）");
+            String msg = String.valueOf(e.getMessage());
+            String hint;
+            if (msg.contains("app is in background") || msg.contains("Background")) {
+                hint = "ArkTerm 刚装好还没打开过——先点「打开 ArkTerm」让它跑完首次启动"
+                        + "（看到 ~ $ 提示符），再回来点一次。";
+            } else if (msg.contains("without permission")) {
+                hint = "缺 com.termux.permission.RUN_COMMAND 授权，回到 App 等它弹权限框。";
+            } else {
+                hint = "若反复失败，先打开一次 ArkTerm 再试。";
+            }
+            LogBus.append("发送 Termux 命令失败：" + msg + "。" + hint);
             return false;
         }
     }
@@ -164,7 +196,9 @@ final class Termux {
             intent.setDataAndType(uri, "application/vnd.android.package-archive");
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
             ctx.startActivity(intent);
-            LogBus.append("已打开系统安装器：" + apk.getName());
+            LogBus.append("已打开系统安装器：" + apk.getName()
+                    + "。装完先打开一次 ArkTerm（首次启动会自动装基础命令），再回来点安装");
+            markNeedsFirstLaunch(ctx);
             return true;
         } catch (Exception e) {
             LogBus.append("打不开安装器：" + e.getMessage() + "（可以手动去文件夹里点）");

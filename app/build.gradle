@@ -9,8 +9,8 @@ android {
         applicationId "ai.panxian.arkdroid"
         minSdk 24
         targetSdk 34
-        versionCode 8
-        versionName "0.3.4"
+        versionCode 9
+        versionName "0.3.5"
 
         ndk {
             // 手机几乎都是 arm64；x86_64 留给模拟器。
