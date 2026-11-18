@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/scroller"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/bg"
@@ -15,13 +16,32 @@
         android:paddingEnd="18dp"
         android:paddingBottom="28dp">
 
-        <TextView
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="ArkDroid"
-            android:textColor="@color/text"
-            android:textSize="26sp"
-            android:textStyle="bold" />
+            android:baselineAligned="true"
+            android:gravity="bottom"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="ArkDroid"
+                android:textColor="@color/text"
+                android:textSize="26sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/txtVersion"
+                style="@style/Hint"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:gravity="end"
+                android:paddingBottom="4dp"
+                android:text="v0.2.1" />
+        </LinearLayout>
 
         <TextView
             style="@style/Hint"
@@ -78,8 +98,135 @@
                 android:textSize="12sp" />
         </LinearLayout>
 
+        <!-- ============================ 去哪 ============================ -->
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/navBridge"
+                    style="@style/BtnNav"
+                    android:layout_width="wrap_content"
+                    android:layout_height="38dp"
+                    android:text="中继" />
+
+                <Space
+                    android:layout_width="8dp"
+                    android:layout_height="1dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/navDl"
+                    style="@style/BtnNav"
+                    android:layout_width="wrap_content"
+                    android:layout_height="38dp"
+                    android:text="下载" />
+
+                <Space
+                    android:layout_width="8dp"
+                    android:layout_height="1dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/navQq"
+                    style="@style/BtnNav"
+                    android:layout_width="wrap_content"
+                    android:layout_height="38dp"
+                    android:text="本机 QQ" />
+
+                <Space
+                    android:layout_width="8dp"
+                    android:layout_height="1dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/navAstr"
+                    style="@style/BtnNav"
+                    android:layout_width="wrap_content"
+                    android:layout_height="38dp"
+                    android:text="AstrBot" />
+
+                <Space
+                    android:layout_width="8dp"
+                    android:layout_height="1dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/navTerm"
+                    style="@style/BtnNav"
+                    android:layout_width="wrap_content"
+                    android:layout_height="38dp"
+                    android:text="终端" />
+
+                <Space
+                    android:layout_width="8dp"
+                    android:layout_height="1dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/navPanel"
+                    style="@style/BtnNav"
+                    android:layout_width="wrap_content"
+                    android:layout_height="38dp"
+                    android:text="浏览器" />
+            </LinearLayout>
+        </HorizontalScrollView>
+
+        <!-- 安装进度：install.sh 每步实时推上来，装 AstrBot / 装 QQ 都显示在这 -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardProgress"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:visibility="gone"
+            app:cardBackgroundColor="@color/surface"
+            app:cardCornerRadius="14dp"
+            app:cardElevation="0dp"
+            app:strokeColor="@color/brand"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:paddingTop="10dp"
+                android:paddingBottom="12dp">
+
+                <TextView
+                    android:id="@+id/txtInstallStep"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/brand"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <ProgressBar
+                    android:id="@+id/progressInstall"
+                    style="?android:attr/progressBarStyleHorizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="6dp"
+                    android:layout_marginTop="8dp"
+                    android:max="100"
+                    android:progress="0"
+                    android:progressTint="@color/brand" />
+
+                <TextView
+                    android:id="@+id/txtInstallHint"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:textColor="@color/muted"
+                    android:textSize="11sp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
         <!-- ============================ 中继 ============================ -->
         <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardBridge"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
@@ -321,8 +468,103 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
+        <!-- ============================ 本机 QQ ============================ -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardQq"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            app:cardBackgroundColor="@color/surface"
+            app:cardCornerRadius="18dp"
+            app:cardElevation="0dp"
+            app:strokeColor="@color/line"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    style="@style/CardTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="本机 QQ（NapCat）" />
+
+                <TextView
+                    android:id="@+id/txtQqState"
+                    style="@style/Hint"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="还没装。装好并扫码登录后，它就是手机里的 QQ 协议端——中继直接连它，不用电脑、不用 ArkLink。" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:baselineAligned="false"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnQqInstall"
+                        style="@style/BtnMain"
+                        android:layout_width="0dp"
+                        android:layout_height="44dp"
+                        android:layout_weight="1"
+                        android:text="装 NapCat" />
+
+                    <Space
+                        android:layout_width="8dp"
+                        android:layout_height="1dp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnQqWeb"
+                        style="@style/BtnGhost"
+                        android:layout_width="0dp"
+                        android:layout_height="44dp"
+                        android:layout_weight="1"
+                        android:text="扫码登录" />
+                </LinearLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnQqStart"
+                    style="@style/BtnMain"
+                    android:layout_width="match_parent"
+                    android:layout_height="42dp"
+                    android:layout_marginTop="8dp"
+                    android:text="启动（QQ 无头 + ArkLink）" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnQqFill"
+                    style="@style/BtnGhost"
+                    android:layout_width="match_parent"
+                    android:layout_height="42dp"
+                    android:layout_marginTop="8dp"
+                    android:text="把中继地址填成本机 127.0.0.1:3001" />
+
+                <TextView
+                    style="@style/Hint"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:text="装的是 QQ 官方 arm64 包（跑在 proot 的 Xvfb 无头里）+ 你提供的 NapCat 压缩包 + ArkLink 翻译层，合计约 250 MB，建议挂 WiFi。装完点「启动」→「扫码登录」，在 WebUI 网络配置里新建 Milky 服务器（127.0.0.1:3000），最后点「填本机地址」。" />
+
+                <TextView
+                    android:id="@+id/txtQqHint"
+                    style="@style/Hint"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:textColor="@color/brand"
+                    android:visibility="gone" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
         <!-- ============================ 内置下载 ============================ -->
         <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardDl"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="14dp"
@@ -371,55 +613,24 @@
                     android:text="一键下载全部" />
 
                 <LinearLayout
+                    android:id="@+id/dlList"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:orientation="horizontal">
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnDlTermux"
-                        style="@style/BtnGhost"
-                        android:layout_width="0dp"
-                        android:layout_height="42dp"
-                        android:layout_weight="1"
-                        android:text="Termux" />
-
-                    <Space
-                        android:layout_width="8dp"
-                        android:layout_height="1dp" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnDlRootfs"
-                        style="@style/BtnGhost"
-                        android:layout_width="0dp"
-                        android:layout_height="42dp"
-                        android:layout_weight="1"
-                        android:text="Ubuntu" />
-
-                    <Space
-                        android:layout_width="8dp"
-                        android:layout_height="1dp" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnDlAstrbot"
-                        style="@style/BtnGhost"
-                        android:layout_width="0dp"
-                        android:layout_height="42dp"
-                        android:layout_weight="1"
-                        android:text="AstrBot" />
-                </LinearLayout>
+                    android:orientation="vertical" />
 
                 <TextView
                     style="@style/Hint"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:text="镜像清单在 dist/manifest.json，挂了会换下一个；下好的包只留在本机，安装时走 127.0.0.1 递给 Termux，不重复走流量。" />
+                    android:text="✓ = 已就绪；点任意一行单独下载那个包。镜像清单在 dist/manifest.json，挂了会换下一个；下好的包只留在本机，安装时走 127.0.0.1 递给 Termux。" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
         <!-- ============================ AstrBot ============================ -->
         <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardAstr"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="14dp"
@@ -556,6 +767,7 @@
 
         <!-- ============================ 终端 ============================ -->
         <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardTerm"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="14dp"
@@ -684,7 +896,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:text="命令在 Termux 里跑，输出在结束时回到上面。要进 Ubuntu 就加前缀：astr run ls /root/AstrBot。常用：astr status、astr log、astr creds" />
+                    android:text="命令在 Termux 后台跑，安装类命令会把输出实时流回上面。要进 Ubuntu 就加前缀：astr run ls /root/AstrBot。常用：astr status、astr log、astr creds" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 

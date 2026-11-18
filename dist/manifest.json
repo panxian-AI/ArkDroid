@@ -1,20 +1,20 @@
 {
-  "version": 3,
+  "version": 4,
   "updated": "2026-11-18",
   "note": "App 会并发测速后挑最快的镜像下载；改这个文件不用重发 APK（App 启动时会尝试拉一次线上的）。",
   "components": [
     {
       "id": "termux",
-      "title": "Termux",
-      "desc": "AstrBot 的运行环境（arm64）",
-      "file": "termux.apk",
+      "title": "ArkTerm（内置版 Termux）",
+      "desc": "已内置 allow-external-apps 授权，装上即用，零配置；如装过官方 Termux 请先卸载",
+      "file": "arkterm.apk",
       "kind": "apk",
-      "size": 35106607,
-      "sha256": "72fdb596045116bf5ba1b5bdf5b26fddb9acc0bd074ad9f2da9eb0ae85e83a4e",
+      "size": 34589623,
+      "sha256": "ea6c0e73eaa659ed146c1eb36e9ea90cada3579e16d883d076276c93e8148595",
       "mirrors": [
-        "https://ghfast.top/https://github.com/termux/termux-app/releases/download/v0.118.3/termux-app_v0.118.3%2Bgithub-debug_arm64-v8a.apk",
-        "https://gh-proxy.com/https://github.com/termux/termux-app/releases/download/v0.118.3/termux-app_v0.118.3%2Bgithub-debug_arm64-v8a.apk",
-        "https://github.com/termux/termux-app/releases/download/v0.118.3/termux-app_v0.118.3%2Bgithub-debug_arm64-v8a.apk"
+        "https://github.com/panxian-AI/ArkDroid/releases/download/arkterm-0.118.3/ArkTerm-0.118.3-arm64.apk",
+        "https://gh-proxy.com/https://github.com/panxian-AI/ArkDroid/releases/download/arkterm-0.118.3/ArkTerm-0.118.3-arm64.apk",
+        "https://ghfast.top/https://github.com/panxian-AI/ArkDroid/releases/download/arkterm-0.118.3/ArkTerm-0.118.3-arm64.apk"
       ]
     },
     {
@@ -30,6 +30,48 @@
         "https://mirrors.aliyun.com/ubuntu-cdimage/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.5-base-arm64.tar.gz",
         "https://mirrors.ustc.edu.cn/ubuntu-cdimage/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.5-base-arm64.tar.gz",
         "https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.5-base-arm64.tar.gz"
+      ]
+    },
+    {
+      "id": "qq",
+      "title": "QQ arm64 安装包",
+      "desc": "官方 Linux QQ NT（本机 QQ 链路的第一环，跑在 proot 里）",
+      "file": "linuxqq_arm64.deb",
+      "kind": "file",
+      "size": 207538924,
+      "sha256": "181b895cb573548e396e54bb0548cca92ffdc1b1a4b018fa4551bb062385fdca",
+      "mirrors": [
+        "https://github.com/panxian-AI/ArkLink/releases/download/qq-3.2.34-arm64/linuxqq_3.2.34-53644_arm64.deb",
+        "https://gh-proxy.com/https://github.com/panxian-AI/ArkLink/releases/download/qq-3.2.34-arm64/linuxqq_3.2.34-53644_arm64.deb",
+        "https://ghfast.top/https://github.com/panxian-AI/ArkLink/releases/download/qq-3.2.34-arm64/linuxqq_3.2.34-53644_arm64.deb"
+      ]
+    },
+    {
+      "id": "napcat",
+      "title": "NapCat 压缩包",
+      "desc": "NapCat.Shell.zip（用户自备，注入 QQ；装完自动配 Milky）",
+      "file": "napcat.zip",
+      "kind": "file",
+      "size": 35945744,
+      "sha256": "bbc7804f5e4a73a58c0564891acf40002b56c149019357fa638da4dfe8f1c286",
+      "mirrors": [
+        "https://github.com/panxian-AI/ArkLink/releases/download/napcat-shell/NapCat.Shell.zip",
+        "https://gh-proxy.com/https://github.com/panxian-AI/ArkLink/releases/download/napcat-shell/NapCat.Shell.zip",
+        "https://ghfast.top/https://github.com/panxian-AI/ArkLink/releases/download/napcat-shell/NapCat.Shell.zip"
+      ]
+    },
+    {
+      "id": "arklink",
+      "title": "ArkLink 源码",
+      "desc": "把 NapCat 的 Milky 翻译成 OneBot 11（中继连它）",
+      "file": "arklink.tar.gz",
+      "kind": "tar",
+      "size": 0,
+      "sha256": "",
+      "mirrors": [
+        "https://gh-proxy.com/https://codeload.github.com/panxian-AI/ArkLink/tar.gz/refs/heads/main",
+        "https://ghfast.top/https://codeload.github.com/panxian-AI/ArkLink/tar.gz/refs/heads/main",
+        "https://codeload.github.com/panxian-AI/ArkLink/tar.gz/refs/heads/main"
       ]
     },
     {

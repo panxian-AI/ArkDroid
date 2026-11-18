@@ -1,0 +1,41 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# ArkLink 控制命令：start/stop/status/log（NapCat 的 Milky → OneBot 11 服务端，ArkBridge 连 6700）
+STATE="$HOME/.arkdroid"
+LOG="$STATE/arklink.log"
+PID="$STATE/arklink.pid"
+
+running() { [ -f "$PID" ] && kill -0 "$(cat "$PID")" 2>/dev/null; }
+
+start() {
+  if [ ! -f "$STATE/rootfs/root/ArkLink/arklink/__main__.py" ]; then
+    echo "ArkLink 还没装（rootfs/root/ArkLink 不存在）。先在 App 的 QQ 卡里点「装本机 QQ」。"
+    exit 1
+  fi
+  if running; then echo "已经在跑了（pid $(cat "$PID")）"; return 0; fi
+  : > "$LOG"
+  nohup "$STATE/proot-run.sh" /bin/bash -c 'cd /root/ArkLink && exec python3 -m arklink serve onebot --type milky --set base_url=http://127.0.0.1:3000 --port 6700 --token ""' >> "$LOG" 2>&1 &
+  echo $! > "$PID"
+  echo "已启动（pid $(cat "$PID")）。ArkBridge 连 ws://127.0.0.1:6700/onebot/v11/ws"
+  sleep 3
+  tail -n 12 "$LOG" 2>/dev/null || true
+}
+
+stop() {
+  if running; then kill "$(cat "$PID")" 2>/dev/null || true; rm -f "$PID"; fi
+  pkill -f "arklink serve onebot" 2>/dev/null || true
+  echo "已停止"
+}
+
+case "${1:-status}" in
+  start) start ;;
+  stop) stop ;;
+  restart) stop; sleep 1; start ;;
+  status)
+    running && echo "进程在跑（pid $(cat "$PID")）" || echo "进程没在跑"
+    code=$(curl -s -o /dev/null -m 4 -w '%{http_code}' http://127.0.0.1:6700/ 2>/dev/null || echo 000)
+    echo "OneBot 服务端 127.0.0.1:6700 → HTTP $code"
+    [ -f "$LOG" ] && echo "日志最后一行：$(tail -n 1 "$LOG" 2>/dev/null)"
+    ;;
+  log) tail -n "${2:-80}" "$LOG" 2>/dev/null || echo "还没日志" ;;
+  *) echo "用法: arklink {start|stop|restart|status|log}" ;;
+esac

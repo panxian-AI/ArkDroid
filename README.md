@@ -83,11 +83,9 @@ Termux 用 `curl` 从本机把包取走（Termux 读不到 App 私有目录，�
 ### 3. 手机全托管（AstrBot 也装手机上）
 
 1. **内置下载 → 一键下载全部**（约 75 MB，进度和速度都显示在卡片上）
-2. **Termux 没装** 时点「安装 / 更新」，会直接用下好的 APK 拉起系统安装器；
-   装完回到 App 点一次「允许外部命令」提示里的命令：
-   ```bash
-   echo "allow-external-apps=true" >> ~/.termux/termux.properties
-   ```
+2. **ArkTerm 没装** 时点「安装 / 更新」，会直接用下好的 APK 拉起系统安装器。
+   ArkTerm 是我们重打包的 Termux，外部应用授权（`allow-external-apps`）已内置，
+   **装上即用，不用敲任何配置命令**。之前装过官方 Termux 的需要先卸载（包名相同）。
 3. 点 **AstrBot → 安装 / 更新**：解 rootfs → 装 Python 3.12 + uv → 解 AstrBot → `uv sync`
    （首次约 1 GB 依赖，挂 WiFi。Termux 窗口里能看到实时进度，装完 App 里显示完整日志）
 4. 装完点 **启动**，等标签变成 `AstrBot · 在线`

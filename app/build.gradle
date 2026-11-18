@@ -9,8 +9,8 @@ android {
         applicationId "ai.panxian.arkdroid"
         minSdk 24
         targetSdk 34
-        versionCode 2
-        versionName "0.2.0"
+        versionCode 12
+        versionName "0.3.8"
 
         ndk {
             // 手机几乎都是 arm64；x86_64 留给模拟器。
@@ -82,10 +82,26 @@ def syncManifest = tasks.register("syncManifest", Copy) {
     into layout.projectDirectory.dir("src/main/assets")
 }
 
-// Termux 侧脚本也只有一份（termux/），同上
-def syncTermux = tasks.register("syncTermux", Copy) {
-    from rootProject.file("termux")
-    into layout.projectDirectory.dir("src/main/assets/termux")
+// Termux 侧脚本也只有一份（termux/），同上。
+// 顺手把行尾压成 LF：这些脚本会被推到手机里的 Termux 执行，
+// CRLF 会让 bash 报 "bad interpreter ... bash^M"。
+def syncTermux = tasks.register("syncTermux") {
+    def src = rootProject.file("termux")
+    def dst = layout.projectDirectory.dir("src/main/assets/termux")
+    inputs.dir(src)
+    outputs.dir(dst)
+    doLast {
+        copy {
+            from src
+            into dst
+        }
+        dst.asFile.listFiles()?.each { f ->
+            if (f.isFile()) {
+                def text = f.getText("UTF-8").replace("\r\n", "\n")
+                f.setText(text, "UTF-8")
+            }
+        }
+    }
 }
 
 tasks.configureEach { task ->

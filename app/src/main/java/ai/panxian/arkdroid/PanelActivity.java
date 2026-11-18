@@ -20,14 +20,26 @@ import android.widget.TextView;
 public class PanelActivity extends Activity {
 
     static final String PANEL_URL = "http://127.0.0.1:6185";
+    static final String EXTRA_URL = "url";
+    static final String EXTRA_TITLE = "title";
 
     private WebView web;
     private TextView status;
+    private String target = PANEL_URL;
+    private String title = "AstrBot 面板";
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        String u = getIntent().getStringExtra(EXTRA_URL);
+        if (u != null && !u.isEmpty()) {
+            target = u;
+        }
+        String t = getIntent().getStringExtra(EXTRA_TITLE);
+        if (t != null && !t.isEmpty()) {
+            title = t;
+        }
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -39,7 +51,7 @@ public class PanelActivity extends Activity {
         bar.setPadding(16, 12, 16, 12);
 
         status = new TextView(this);
-        status.setText("AstrBot 面板 · " + PANEL_URL);
+        status.setText(title + " · " + target);
         status.setTextColor(Color.parseColor("#B7C3D0"));
         status.setTextSize(13);
         status.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
@@ -49,7 +61,7 @@ public class PanelActivity extends Activity {
         bar.addView(button("账号", v -> showCreds()));
         bar.addView(button("外部", v -> {
             try {
-                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(PANEL_URL)));
+                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(target)));
             } catch (Exception ignored) {
                 // 没浏览器就算了，内置的还能用
             }
@@ -65,7 +77,7 @@ public class PanelActivity extends Activity {
         s.setLoadWithOverviewMode(true);
         s.setSupportZoom(false);
         s.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
-        s.setUserAgentString(s.getUserAgentString() + " ArkDroid/0.2");
+        s.setUserAgentString(s.getUserAgentString() + " ArkDroid/0.3");
         web.setWebViewClient(new WebViewClient());
         web.setWebChromeClient(new WebChromeClient());
         web.setBackgroundColor(Color.parseColor("#0F141A"));
@@ -74,7 +86,7 @@ public class PanelActivity extends Activity {
         root.addView(web);
 
         setContentView(root);
-        web.loadUrl(PANEL_URL);
+        web.loadUrl(target);
     }
 
     private Button button(String text, android.view.View.OnClickListener listener) {
@@ -89,7 +101,7 @@ public class PanelActivity extends Activity {
     private void showCreds() {
         String text = Creds.summary();
         status.setText(text);
-        status.postDelayed(() -> status.setText("AstrBot 面板 · " + PANEL_URL), 6000);
+        status.postDelayed(() -> status.setText(title + " · " + target), 6000);
     }
 
     @Override

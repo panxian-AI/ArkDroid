@@ -1,0 +1,52 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# 本机 QQ 控制命令：start/stop/status/log（QQ(Xvfb 无头) + NapCat 注入层）
+STATE="$HOME/.arkdroid"
+LOG="$STATE/qq.log"
+PID="$STATE/qq.pid"
+
+running() { [ -f "$PID" ] && kill -0 "$(cat "$PID")" 2>/dev/null; }
+
+start() {
+  if [ ! -f "$STATE/rootfs/opt/QQ/qq" ]; then
+    echo "QQ 还没装（rootfs/opt/QQ/qq 不存在）。先在 App 的 QQ 卡里点「装本机 QQ」。"
+    exit 1
+  fi
+  if running; then echo "已经在跑了（pid $(cat "$PID")）"; return 0; fi
+  : > "$LOG"
+  nohup "$STATE/proot-run.sh" /bin/bash -c '
+cd /root
+pgrep -x Xvfb >/dev/null || { Xvfb :1 -screen 0 1280x720x16 -nolisten tcp >/root/.arkdroid/xvfb.log 2>&1 & }
+sleep 2
+export DISPLAY=:1 HOME=/root
+exec /opt/QQ/qq --no-sandbox \
+  --disable-gpu \
+  --disable-software-rasterizer \
+  --disable-gpu-compositing \
+  --disable-dev-shm-usage
+  ' >> "$LOG" 2>&1 &
+  echo $! > "$PID"
+  echo "已启动（pid $(cat "$PID")）。首次登录：浏览器开 http://127.0.0.1:6099/webui 扫码"
+  sleep 4
+  tail -n 12 "$LOG" 2>/dev/null || true
+}
+
+stop() {
+  if running; then kill "$(cat "$PID")" 2>/dev/null || true; rm -f "$PID"; fi
+  pkill -f "/opt/QQ/qq" 2>/dev/null || true
+  pkill -f "Xvfb :1" 2>/dev/null || true
+  echo "已停止"
+}
+
+case "${1:-status}" in
+  start) start ;;
+  stop) stop ;;
+  restart) stop; sleep 2; start ;;
+  status)
+    running && echo "进程在跑（pid $(cat "$PID")）" || echo "进程没在跑"
+    code=$(curl -s -o /dev/null -m 4 -w '%{http_code}' http://127.0.0.1:6099/ 2>/dev/null || echo 000)
+    echo "NapCat WebUI 127.0.0.1:6099 → HTTP $code（401/200 都算在线）"
+    [ -f "$LOG" ] && echo "日志最后一行：$(tail -n 1 "$LOG" 2>/dev/null)"
+    ;;
+  log) tail -n "${2:-80}" "$LOG" 2>/dev/null || echo "还没日志" ;;
+  *) echo "用法: qq {start|stop|restart|status|log}" ;;
+esac
